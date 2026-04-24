@@ -35,6 +35,11 @@ pub trait SweatApi {
     fn formula(&self, steps_since_tge: U64, steps: u32) -> U128;
 }
 
+pub trait RestrictionApi {
+    fn is_restricted(&self, account_id: &AccountId) -> bool;
+    fn set_restricted(&mut self, account_id: &AccountId, is_restricted: bool);
+}
+
 #[make_integration_version]
 pub trait SweatDefer {
     fn defer_batch(
