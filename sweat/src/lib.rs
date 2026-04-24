@@ -11,13 +11,15 @@ use near_sdk::{
     collections::UnorderedSet,
     env,
     json_types::{U128, U64},
-    near_bindgen, require, AccountId, Balance, PanicOnDefault, PromiseOrValue,
+    near_bindgen, require, AccountId, Balance, PanicOnDefault,
 };
-use sweat_model::{Payout, SweatApi};
+use sweat_model::{Payout, RestrictionApi, SweatApi};
 
+mod core;
 mod defer;
 mod integration;
 mod math;
+mod migration;
 
 #[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
@@ -25,6 +27,7 @@ pub struct Contract {
     oracles: UnorderedSet<AccountId>,
     token: FungibleToken,
     steps_since_tge: U64,
+    denylist: UnorderedSet<AccountId>,
 }
 
 #[near_bindgen]
@@ -35,6 +38,7 @@ impl SweatApi for Contract {
             oracles: UnorderedSet::new(b"s"),
             token: FungibleToken::new(b"t", postfix),
             steps_since_tge: U64::from(0),
+            denylist: UnorderedSet::new(b"d"),
         }
     }
     fn add_oracle(&mut self, account_id: &AccountId) {
@@ -150,6 +154,26 @@ impl SweatApi for Contract {
     }
 }
 
+#[near_bindgen]
+impl RestrictionApi for Contract {
+    fn is_restricted(&self, account_id: &AccountId) -> bool {
+        self.denylist.contains(account_id)
+    }
+
+    fn set_restricted(&mut self, account_id: &AccountId, is_restricted: bool) {
+        require!(
+            env::predecessor_account_id() == env::current_account_id(),
+            "Unauthorized access! Only token owner can do restrict accounts!"
+        );
+
+        if is_restricted {
+            self.denylist.insert(account_id);
+        } else {
+            self.denylist.remove(account_id);
+        }
+    }
+}
+
 impl Contract {
     pub(crate) fn calculate_tokens_amount(&self, steps: u32) -> (u128, u128) {
         let sweat_to_mint: u128 = self.formula(self.steps_since_tge, steps).0;
@@ -157,10 +181,16 @@ impl Contract {
 
         (payout.amount_for_user, payout.fee)
     }
-}
 
-near_contract_standards::impl_fungible_token_core!(Contract, token);
-near_contract_standards::impl_fungible_token_storage!(Contract, token);
+    pub(crate) fn assert_not_in_denylist(&self, account_ids: Vec<&AccountId>) {
+        for account_id in account_ids {
+            require!(
+                !self.is_restricted(account_id),
+                format!("The account {account_id} is restricted")
+            );
+        }
+    }
+}
 
 /// Taken from contract standards but modified to default if account isn't initialized
 /// rather than panicking:
@@ -202,7 +232,7 @@ mod tests {
         test_utils::VMContextBuilder,
         testing_env, AccountId,
     };
-    use sweat_model::SweatApi;
+    use sweat_model::{RestrictionApi, SweatApi};
 
     use crate::Contract;
 
@@ -418,5 +448,73 @@ mod tests {
         assert!((0.0 - token.token.ft_balance_of(user1()).0 as f64 / 1e+18).abs() < EPS);
 
         assert!((9.499_999_991_723_028 * 2.0 - token.token.ft_balance_of(user2()).0 as f64 / 1e+18).abs() < EPS);
+    }
+
+    #[test]
+    #[should_panic(expected = r#"The account sweat_user1 is restricted"#)]
+    fn transfer_from_denied_account() {
+        testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
+        let mut token = Contract::new(Some(".u.sweat".to_string()));
+        assert!(token.get_oracles().is_empty());
+        token.add_oracle(&sweat_oracle());
+        token.tge_mint_batch(vec![
+            (user1(), U128(9499999991723028480)),
+            (user2(), U128(9499999991723028480)),
+        ]);
+        token.set_restricted(&user1(), true);
+
+        testing_env!(get_context(sweat_the_token(), user1()).build());
+        token.ft_transfer(user2(), U128(9499999991723028480), None);
+    }
+
+    #[test]
+    #[should_panic(expected = r#"The account sweat_user2 is restricted"#)]
+    fn transfer_to_denied_account() {
+        testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
+        let mut token = Contract::new(Some(".u.sweat".to_string()));
+        assert!(token.get_oracles().is_empty());
+        token.add_oracle(&sweat_oracle());
+        token.tge_mint_batch(vec![
+            (user1(), U128(9499999991723028480)),
+            (user2(), U128(9499999991723028480)),
+        ]);
+        token.set_restricted(&user2(), true);
+
+        testing_env!(get_context(sweat_the_token(), user1()).build());
+        token.ft_transfer(user2(), U128(9499999991723028480), None);
+    }
+
+    #[test]
+    #[should_panic(expected = r#"The account sweat_user1 is restricted"#)]
+    fn ft_transfer_call_from_denied_account() {
+        testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
+        let mut token = Contract::new(Some(".u.sweat".to_string()));
+        assert!(token.get_oracles().is_empty());
+        token.add_oracle(&sweat_oracle());
+        token.tge_mint_batch(vec![
+            (user1(), U128(9499999991723028480)),
+            (user2(), U128(9499999991723028480)),
+        ]);
+        token.set_restricted(&user1(), true);
+
+        testing_env!(get_context(sweat_the_token(), user1()).build());
+        token.ft_transfer_call(user2(), U128(9499999991723028480), None, String::from("test"));
+    }
+
+    #[test]
+    #[should_panic(expected = r#"The account sweat_user2 is restricted"#)]
+    fn ft_transfer_call_to_denied_account() {
+        testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
+        let mut token = Contract::new(Some(".u.sweat".to_string()));
+        assert!(token.get_oracles().is_empty());
+        token.add_oracle(&sweat_oracle());
+        token.tge_mint_batch(vec![
+            (user1(), U128(9499999991723028480)),
+            (user2(), U128(9499999991723028480)),
+        ]);
+        token.set_restricted(&user2(), true);
+
+        testing_env!(get_context(sweat_the_token(), user1()).build());
+        token.ft_transfer_call(user2(), U128(9499999991723028480), None, String::from("test"));
     }
 }
