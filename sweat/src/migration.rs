@@ -19,6 +19,9 @@ pub struct OldContract {
 impl Contract {
     #[private]
     #[init(ignore_state)]
+    /// # Panics
+    ///
+    /// Panics if the old contract state cannot be read.
     pub fn migrate_state() -> Self {
         let old: OldContract = near_sdk::env::state_read().expect("Old state doesn't exist");
 

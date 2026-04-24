@@ -162,8 +162,8 @@ impl RestrictionApi for Contract {
 
     fn set_restricted(&mut self, account_id: &AccountId, is_restricted: bool) {
         require!(
-            self.oracles.contains(&env::predecessor_account_id()),
-            "Unauthorized access! Only oracle can call that!"
+            env::predecessor_account_id() == env::current_account_id(),
+            "Unauthorized access! Only token owner can do restrict accounts!"
         );
 
         if is_restricted {
@@ -461,7 +461,6 @@ mod tests {
             (user1(), U128(9499999991723028480)),
             (user2(), U128(9499999991723028480)),
         ]);
-        testing_env!(get_context(sweat_the_token(), sweat_oracle()).build());
         token.set_restricted(&user1(), true);
 
         testing_env!(get_context(sweat_the_token(), user1()).build());
@@ -479,7 +478,6 @@ mod tests {
             (user1(), U128(9499999991723028480)),
             (user2(), U128(9499999991723028480)),
         ]);
-        testing_env!(get_context(sweat_the_token(), sweat_oracle()).build());
         token.set_restricted(&user2(), true);
 
         testing_env!(get_context(sweat_the_token(), user1()).build());
@@ -497,7 +495,6 @@ mod tests {
             (user1(), U128(9499999991723028480)),
             (user2(), U128(9499999991723028480)),
         ]);
-        testing_env!(get_context(sweat_the_token(), sweat_oracle()).build());
         token.set_restricted(&user1(), true);
 
         testing_env!(get_context(sweat_the_token(), user1()).build());
@@ -515,7 +512,6 @@ mod tests {
             (user1(), U128(9499999991723028480)),
             (user2(), U128(9499999991723028480)),
         ]);
-        testing_env!(get_context(sweat_the_token(), sweat_oracle()).build());
         token.set_restricted(&user2(), true);
 
         testing_env!(get_context(sweat_the_token(), user1()).build());
