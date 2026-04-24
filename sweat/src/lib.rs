@@ -159,7 +159,7 @@ impl Contract {
     }
 }
 
-near_contract_standards::impl_fungible_token_core!(Contract, token);
+// near_contract_standards::impl_fungible_token_core!(Contract, token);
 near_contract_standards::impl_fungible_token_storage!(Contract, token);
 
 /// Taken from contract standards but modified to default if account isn't initialized
