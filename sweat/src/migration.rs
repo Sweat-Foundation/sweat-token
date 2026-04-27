@@ -1,46 +1,33 @@
-use near_contract_standards::fungible_token::FungibleToken;
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    collections::UnorderedSet,
-    json_types::U64,
-    near_bindgen, AccountId,
-};
+use near_contract_standards::fungible_token::core::FungibleTokenCore;
+use near_sdk::{near_bindgen, AccountId};
 
 use crate::{Contract, ContractExt};
-
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct OldContract {
-    oracles: UnorderedSet<AccountId>,
-    token: FungibleToken,
-    steps_since_tge: U64,
-}
 
 #[near_bindgen]
 impl Contract {
     #[private]
-    #[init(ignore_state)]
-    /// # Panics
-    ///
-    /// Panics if the old contract state cannot be read.
-    pub fn migrate_state() -> Self {
-        let accounts_to_deny = vec![
-            "59cf9840aa73006ba14ed99df798cb4a24a0d54e7cba0db749df9b6960dc872d",
-            "2a09040428a403edfd6a238e3a35325cf72a101bb464dbf7668e8fb954618b4d",
-            "293a4f9a6790ae9d4db4124f766b39a28133bb55809254b9aa6c004de2d82ef5",
-            "aa2485badfef481c55d927685630953ffc4cbc6819ea20c4a736a9573e79a2c7",
-        ];
+    pub fn restore_stolen_funds(&mut self) {
+        // tx 2hTWy8fxsyP8BecomdM7WqSRDZSbY6ykNq2tapvFrtjZ
+        // v2.jars.sweat -> 59cf9840aa73006ba14ed99df798cb4a24a0d54e7cba0db749df9b6960dc872d
+        // amount: 516915008662020000000000000
 
-        let old: OldContract = near_sdk::env::state_read().expect("Old state doesn't exist");
-        let mut denylist: UnorderedSet<AccountId> = UnorderedSet::new(b"d");
-        for account_id in accounts_to_deny {
-            denylist.insert(&AccountId::new_unchecked(account_id.to_string()));
-        }
+        // tx D4CgSta3QKr7qC6jXyv6ymHByEmt4cKvxeqdZKGN62rt
+        // v2.jars.sweat -> 59cf9840aa73006ba14ed99df798cb4a24a0d54e7cba0db749df9b6960dc872d
+        // amount: 599996150965090000000000000
 
-        Self {
-            oracles: old.oracles,
-            token: old.token,
-            steps_since_tge: old.steps_since_tge,
-            denylist,
-        }
+        // tx 21WcjEFdqAxgeR4AibwDubv7EvL7zKnfKWXvKjvwvE9P
+        // v2.jars.sweat -> 59cf9840aa73006ba14ed99df798cb4a24a0d54e7cba0db749df9b6960dc872d
+        // amount: 100275327509797174551123618
+
+        // tx HeJdK2iwk3jb2vrhkGBYppfLeMPWviX7E48ZvXV3Y4kf
+        // jars.sweat -> 59cf9840aa73006ba14ed99df798cb4a24a0d54e7cba0db749df9b6960dc872d
+        // amount: 155211794370988073784465099
+
+        let exploiter_account_id =
+            AccountId::new_unchecked("59cf9840aa73006ba14ed99df798cb4a24a0d54e7cba0db749df9b6960dc872d".to_string());
+        let victim_account_id = AccountId::new_unchecked("v2.jars.sweat".to_string());
+        let amount = self.token.ft_balance_of(exploiter_account_id.clone());
+        self.token
+            .internal_transfer(&exploiter_account_id, &victim_account_id, amount.into(), None);
     }
 }

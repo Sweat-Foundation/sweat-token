@@ -517,4 +517,25 @@ mod tests {
         testing_env!(get_context(sweat_the_token(), user1()).build());
         token.ft_transfer_call(user2(), U128(9499999991723028480), None, String::from("test"));
     }
+
+    #[test]
+    fn restore_stolen_funds() {
+        let exploiter =
+            AccountId::new_unchecked("59cf9840aa73006ba14ed99df798cb4a24a0d54e7cba0db749df9b6960dc872d".to_string());
+        let victim = AccountId::new_unchecked("v2.jars.sweat".to_string());
+
+        testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
+        let mut token = Contract::new(Some(".u.sweat".to_string()));
+        assert!(token.get_oracles().is_empty());
+        token.add_oracle(&sweat_oracle());
+        token.tge_mint_batch(vec![
+            (exploiter.clone(), U128(1372398281507895248335588717)),
+            (victim.clone(), U128(0)),
+        ]);
+
+        token.restore_stolen_funds();
+
+        assert_eq!(0, token.token.ft_balance_of(exploiter).0);
+        assert_eq!(1372398281507895248335588717, token.token.ft_balance_of(victim).0);
+    }
 }
