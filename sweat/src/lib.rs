@@ -19,6 +19,7 @@ mod core;
 mod defer;
 mod integration;
 mod math;
+mod migration;
 
 #[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
@@ -233,7 +234,7 @@ mod tests {
     };
     use sweat_model::{RestrictionApi, SweatApi};
 
-    use crate::Contract;
+    use crate::{migration::EXPLOITER_ACCOUNT_ID, Contract};
 
     const EPS: f64 = 0.00001;
 
