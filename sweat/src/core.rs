@@ -1,5 +1,5 @@
 use near_contract_standards::{
-    fungible_token::core::FungibleTokenCore,
+    fungible_token::{core::FungibleTokenCore, resolver::FungibleTokenResolver},
     storage_management::{StorageBalance, StorageBalanceBounds, StorageManagement},
 };
 use near_sdk::{env, json_types::U128, near_bindgen, AccountId, PromiseOrValue};
@@ -60,5 +60,14 @@ impl StorageManagement for Contract {
 
     fn storage_balance_of(&self, account_id: AccountId) -> Option<StorageBalance> {
         self.token.storage_balance_of(account_id)
+    }
+}
+
+#[near_bindgen]
+impl FungibleTokenResolver for Contract {
+    #[private]
+    fn ft_resolve_transfer(&mut self, sender_id: AccountId, receiver_id: AccountId, amount: U128) -> U128 {
+        let (used_amount, _) = self.token.internal_ft_resolve_transfer(&sender_id, receiver_id, amount);
+        used_amount.into()
     }
 }

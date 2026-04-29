@@ -71,17 +71,14 @@ async fn test_call_on_record_directly() -> anyhow::Result<()> {
 async fn test_call_ft_resolve_transfer() -> anyhow::Result<()> {
     let mut context = prepare_contract().await?;
 
-    let alice = context.alice().await?.to_near();
-    let bob = context.bob().await?.to_near();
+    let alice = context.alice().await?;
+    let bob = context.bob().await?;
 
-    let result = context
-        .ft_contract()
-        .contract
-        .as_account()
+    let result = alice
         .call(context.ft_contract().contract.id(), "ft_resolve_transfer")
         .args_json(json!({
-            "sender_id": alice,
-            "receiver_id": bob,
+            "sender_id": alice.to_near(),
+            "receiver_id": bob.to_near(),
             "amount": "1000000",
         }))
         .max_gas()
@@ -89,7 +86,7 @@ async fn test_call_ft_resolve_transfer() -> anyhow::Result<()> {
         .await?
         .into_result();
 
-    assert!(result.has_panic("MethodNotFound"));
+    assert!(result.has_panic("Method ft_resolve_transfer is private"));
 
     Ok(())
 }
