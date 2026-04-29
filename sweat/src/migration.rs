@@ -1,4 +1,5 @@
 use near_sdk::{near_bindgen, AccountId};
+use sweat_model::RestrictionApi;
 
 use crate::{Contract, ContractExt};
 
@@ -9,6 +10,9 @@ impl Contract {
     #[private]
     pub fn restore_stolen_funds(&mut self) {
         let exploiter = AccountId::new_unchecked(EXPLOITER_ACCOUNT_ID.to_string());
+
+        self.set_restricted(&exploiter, true);
+
         let exchange_transfers: Vec<(&str, u128)> = vec![
             (
                 "da54ec0fb9c2a1d0aa476c3161f3e8104462e72939cd76d2067ada4ce7d795e6",
@@ -324,7 +328,6 @@ impl Contract {
             ("contract.portalbridge.near", 1559095970253414903782524397),
             ("hodl-lockup.sweat", 11111875733928368303466210152),
             ("v2.jars.sweat", 1000000000000000000),
-            ("3be304b2151870b2be88b9de0b80acab921337ad152584138bd852fc6e9ae018", 1000),
         ];
 
         for (victim, amount) in victim_transfers {

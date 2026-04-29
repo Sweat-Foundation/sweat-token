@@ -66,3 +66,30 @@ async fn test_call_on_record_directly() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_call_ft_resolve_transfer() -> anyhow::Result<()> {
+    let mut context = prepare_contract().await?;
+
+    let alice = context.alice().await?.to_near();
+    let bob = context.bob().await?.to_near();
+
+    let result = context
+        .ft_contract()
+        .contract
+        .as_account()
+        .call(context.ft_contract().contract.id(), "ft_resolve_transfer")
+        .args_json(json!({
+            "sender_id": alice,
+            "receiver_id": bob,
+            "amount": "1000000",
+        }))
+        .max_gas()
+        .transact()
+        .await?
+        .into_result();
+
+    assert!(result.has_panic("MethodNotFound"));
+
+    Ok(())
+}
