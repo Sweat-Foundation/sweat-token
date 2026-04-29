@@ -67,9 +67,7 @@ impl StorageManagement for Contract {
     }
 }
 
-#[near_bindgen]
 impl FungibleTokenResolver for Contract {
-    #[private]
     fn ft_resolve_transfer(&mut self, sender_id: AccountId, receiver_id: AccountId, amount: U128) -> U128 {
         let (used_amount, _burned_amount) = self.token.internal_ft_resolve_transfer(&sender_id, receiver_id, amount);
         used_amount.into()
