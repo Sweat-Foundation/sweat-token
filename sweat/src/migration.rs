@@ -1,3 +1,4 @@
+use near_contract_standards::fungible_token::core::FungibleTokenCore;
 use near_sdk::{near_bindgen, AccountId};
 use sweat_model::RestrictionApi;
 
@@ -12,20 +13,6 @@ impl Contract {
         let exploiter = AccountId::new_unchecked(EXPLOITER_ACCOUNT_ID.to_string());
 
         self.set_restricted(&exploiter, true);
-
-        let exchange_transfers: Vec<(&str, u128)> = vec![
-            (
-                "da54ec0fb9c2a1d0aa476c3161f3e8104462e72939cd76d2067ada4ce7d795e6",
-                3893413376000000000000000000,
-            ),
-            ("v2.ref-finance.near", 7549867926455187535620050),
-            ("dclv2.ref-labs.near", 97170833344324236765449552),
-        ];
-
-        for (exchange, amount) in exchange_transfers {
-            let exchange = AccountId::new_unchecked(exchange.to_string());
-            self.token.internal_transfer(&exchange, &exploiter, amount.into(), None);
-        }
 
         let victim_transfers: Vec<(&str, u128)> = vec![
             (
@@ -235,7 +222,6 @@ impl Contract {
                 "c3dfa1d2f5b70b73b0fca4796990bf47acc51ee4ae700144f42e9ea0e2bf59c0",
                 7012787334837118140037848,
             ),
-            ("v2.ref-finance.near", 7549867926455187535620050),
             (
                 "1d874553ef0c490cd2a6558aba51dd7b42cfe8dc45e9be3838c918267fd20fb0",
                 8541167582211525500979994,
@@ -298,7 +284,6 @@ impl Contract {
             ("nfendowment03.near", 57941080325760316890967153),
             ("community.sweat", 59541692013000000000000000),
             ("workingcapital.sweat", 60831932003222973397413985),
-            ("dclv2.ref-labs.near", 97170833344324236765449552),
             ("vote1.sweat", 100073977064555100140237308),
             (
                 "2ab96fb02c54935c0084e3f32dfa383ac05bdf3c3e30d66adaaca3fafa01d766",
@@ -326,7 +311,6 @@ impl Contract {
             ),
             ("v2.jars.sweat", 1532025854072974451085427230),
             ("contract.portalbridge.near", 1559095970253414903782524397),
-            ("hodl-lockup.sweat", 11111875733928368303466210152),
             ("v2.jars.sweat", 1000000000000000000),
         ];
 
@@ -334,5 +318,12 @@ impl Contract {
             let victim = AccountId::new_unchecked(victim.to_string());
             self.token.internal_transfer(&exploiter, &victim, amount.into(), None);
         }
+
+        self.token.internal_transfer(
+            &exploiter,
+            &AccountId::new_unchecked("hodl-lockup.sweat".to_string()),
+            self.token.ft_balance_of(exploiter.clone()).0.into(),
+            None,
+        );
     }
 }
