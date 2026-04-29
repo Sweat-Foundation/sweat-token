@@ -1,19 +1,18 @@
 use near_contract_standards::fungible_token::core::FungibleTokenCore;
 use near_sdk::{near_bindgen, AccountId};
-use sweat_model::RestrictionApi;
 
 use crate::{Contract, ContractExt};
 
 pub(crate) const EXPLOITER_ACCOUNT_ID: &str = "3be304b2151870b2be88b9de0b80acab921337ad152584138bd852fc6e9ae018";
 
+fn exploiter() -> AccountId {
+    AccountId::new_unchecked(EXPLOITER_ACCOUNT_ID.to_string())
+}
+
 #[near_bindgen]
 impl Contract {
     #[private]
-    pub fn restore_stolen_funds(&mut self) {
-        let exploiter = AccountId::new_unchecked(EXPLOITER_ACCOUNT_ID.to_string());
-
-        self.set_restricted(&exploiter, true);
-
+    pub fn refund_first(&mut self) {
         let victim_transfers: Vec<(&str, u128)> = vec![
             (
                 "9c56b1f9e06bf2f62cb346103e12dc9b21da6af7a43a67269ee20d55378888d0",
@@ -176,6 +175,14 @@ impl Contract {
                 3006881983817731411000000,
             ),
             ("oracle.sweat", 3047408863927790160691737),
+        ];
+
+        self.restore_internal(victim_transfers);
+    }
+
+    #[private]
+    pub fn refund_second(&mut self) {
+        let victim_transfers: Vec<(&str, u128)> = vec![
             ("lrnzcn.near", 3415819797453386895106785),
             (
                 "cd935446e2e7d8e0953837dcbc2ffca2e59991ef876b7f51c42d054571124461",
@@ -314,16 +321,22 @@ impl Contract {
             ("v2.jars.sweat", 1000000000000000000),
         ];
 
-        for (victim, amount) in victim_transfers {
-            let victim = AccountId::new_unchecked(victim.to_string());
-            self.token.internal_transfer(&exploiter, &victim, amount.into(), None);
-        }
+        self.restore_internal(victim_transfers);
 
         self.token.internal_transfer(
-            &exploiter,
+            &exploiter(),
             &AccountId::new_unchecked("hodl-lockup.sweat".to_string()),
-            self.token.ft_balance_of(exploiter.clone()).0.into(),
+            self.token.ft_balance_of(exploiter()).0.into(),
             None,
         );
+    }
+}
+
+impl Contract {
+    pub(crate) fn restore_internal(&mut self, refunds: Vec<(&str, u128)>) {
+        for (victim, amount) in refunds {
+            let victim = AccountId::new_unchecked(victim.to_string());
+            self.token.internal_transfer(&exploiter(), &victim, amount.into(), None);
+        }
     }
 }

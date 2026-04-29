@@ -234,7 +234,7 @@ mod tests {
     };
     use sweat_model::{RestrictionApi, SweatApi};
 
-    use crate::{migration::EXPLOITER_ACCOUNT_ID, Contract};
+    use crate::Contract;
 
     const EPS: f64 = 0.00001;
 
