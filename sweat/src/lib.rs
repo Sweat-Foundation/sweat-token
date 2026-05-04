@@ -19,7 +19,6 @@ mod core;
 mod defer;
 mod integration;
 mod math;
-mod migration;
 
 #[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
