@@ -1,27 +1,27 @@
 #[macro_use]
 extern crate static_assertions;
 
+use api::{Payout, RestrictionApi, SweatApi};
 use near_contract_standards::fungible_token::{
     events::{FtBurn, FtMint},
     metadata::{FungibleTokenMetadata, FungibleTokenMetadataProvider},
-    FungibleToken,
+    Balance, FungibleToken,
 };
 use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
     collections::UnorderedSet,
     env,
     json_types::{U128, U64},
-    near_bindgen, require, AccountId, Balance, PanicOnDefault,
+    near, require, AccountId, PanicOnDefault,
 };
-use sweat_model::{Payout, RestrictionApi, SweatApi};
 
+mod api;
 mod core;
 mod defer;
 mod integration;
 mod math;
 
-#[near_bindgen]
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
+#[near(contract_state)]
+#[derive(PanicOnDefault)]
 pub struct Contract {
     oracles: UnorderedSet<AccountId>,
     token: FungibleToken,
@@ -29,13 +29,13 @@ pub struct Contract {
     denylist: UnorderedSet<AccountId>,
 }
 
-#[near_bindgen]
+#[near]
 impl SweatApi for Contract {
     #[init]
     fn new(postfix: Option<String>) -> Self {
         Self {
             oracles: UnorderedSet::new(b"s"),
-            token: FungibleToken::new(b"t", postfix),
+            token: FungibleToken::new(b"t"), //, postfix),
             steps_since_tge: U64::from(0),
             denylist: UnorderedSet::new(b"d"),
         }
@@ -70,7 +70,7 @@ impl SweatApi for Contract {
         internal_deposit(&mut self.token, account_id, amount.0);
         FtMint {
             owner_id: account_id,
-            amount: &amount,
+            amount,
             memo: None,
         }
         .emit();
@@ -88,7 +88,7 @@ impl SweatApi for Contract {
 
             let event = FtMint {
                 owner_id: account_id,
-                amount: steps_count,
+                amount: *steps_count,
                 memo: None,
             };
             events.push(event);
@@ -98,7 +98,7 @@ impl SweatApi for Contract {
         }
     }
 
-    fn burn(&mut self, amount: &U128) {
+    fn burn(&mut self, amount: U128) {
         self.token.internal_withdraw(&env::predecessor_account_id(), amount.0);
         FtBurn {
             amount,
@@ -132,7 +132,7 @@ impl SweatApi for Contract {
         for i in 0..steps_batch.len() {
             events.push(FtMint {
                 owner_id: &steps_batch[i].0,
-                amount: &sweats[i],
+                amount: sweats[i],
                 memo: None,
             });
         }
@@ -140,7 +140,7 @@ impl SweatApi for Contract {
         internal_deposit(&mut self.token, &env::predecessor_account_id(), oracle_fee.0);
         let oracle_event = FtMint {
             owner_id: &env::predecessor_account_id(),
-            amount: &oracle_fee,
+            amount: oracle_fee,
             memo: None,
         };
         events.push(oracle_event);
@@ -153,7 +153,7 @@ impl SweatApi for Contract {
     }
 }
 
-#[near_bindgen]
+#[near]
 impl RestrictionApi for Contract {
     fn is_restricted(&self, account_id: &AccountId) -> bool {
         self.denylist.contains(account_id)
@@ -208,7 +208,7 @@ fn internal_deposit(token: &mut FungibleToken, account_id: &AccountId, amount: B
 
 pub const ICON: &str = "data:image/svg+xml,%3Csvg viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100' height='100' rx='50' fill='%23FF0D75'/%3E%3Cg clip-path='url(%23clip0_283_2788)'%3E%3Cpath d='M39.4653 77.5455L19.0089 40.02L35.5411 22.2805L55.9975 59.806L39.4653 77.5455Z' stroke='white' stroke-width='10'/%3E%3Cpath d='M66.0253 77.8531L45.569 40.3276L62.1012 22.5882L82.5576 60.1136L66.0253 77.8531Z' stroke='white' stroke-width='10'/%3E%3C/g%3E%3Cdefs%3E%3CclipPath id='clip0_283_2788'%3E%3Crect width='100' height='56' fill='white' transform='translate(0 22)'/%3E%3C/clipPath%3E%3C/defs%3E%3C/svg%3E%0A";
 
-#[near_bindgen]
+#[near]
 impl FungibleTokenMetadataProvider for Contract {
     fn ft_metadata(&self) -> FungibleTokenMetadata {
         FungibleTokenMetadata {

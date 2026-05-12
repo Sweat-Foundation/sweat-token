@@ -1,6 +1,5 @@
 #![allow(clippy::new_ret_no_self, clippy::wrong_self_convention)]
 
-use integration_trait::make_integration_version;
 use near_contract_standards::storage_management::{StorageBalance, StorageBalanceBounds};
 use near_sdk::{
     json_types::{U128, U64},
@@ -12,7 +11,6 @@ pub struct SweatContract<'a> {
     pub contract: &'a near_workspaces::Contract,
 }
 
-#[make_integration_version]
 pub trait SweatApi {
     fn new(postfix: Option<String>) -> Self;
     fn add_oracle(&mut self, account_id: &AccountId);
@@ -37,7 +35,6 @@ pub trait SweatDefer {
 }
 
 /// Copy of near_sdk trait to use in integration tests
-#[make_integration_version]
 pub trait FungibleTokenCore {
     #[deposit_one_yocto]
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
@@ -53,7 +50,6 @@ pub trait FungibleTokenCore {
 }
 
 /// Copy of near_sdk trait to use in integration tests
-#[make_integration_version]
 pub trait StorageManagement {
     // if `registration_only=true` MUST refund above the minimum balance if the account didn't exist and
     //     refund full deposit if the account exists.
@@ -94,7 +90,6 @@ pub trait StorageManagement {
     fn storage_balance_of(&self, account_id: AccountId) -> Option<StorageBalance>;
 }
 
-#[make_integration_version]
 pub trait IntegrationTestMethods {
     fn calculate_payout_with_fee_for_batch(&self, batch_size: u32, claim_amount: u32) -> (U128, U128);
 }

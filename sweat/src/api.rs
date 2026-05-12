@@ -1,0 +1,42 @@
+use near_sdk::{
+    json_types::{U128, U64},
+    AccountId, PromiseOrValue,
+};
+
+pub trait SweatApi {
+    fn new(postfix: Option<String>) -> Self;
+    fn add_oracle(&mut self, account_id: &AccountId);
+    fn remove_oracle(&mut self, account_id: &AccountId);
+    fn get_oracles(&self) -> Vec<AccountId>;
+    fn tge_mint(&mut self, account_id: &AccountId, amount: U128);
+    fn tge_mint_batch(&mut self, batch: Vec<(AccountId, U128)>);
+    fn burn(&mut self, amount: U128);
+    fn get_steps_since_tge(&self) -> U64;
+    fn record_batch(&mut self, steps_batch: Vec<(AccountId, u32)>);
+    fn formula(&self, steps_since_tge: U64, steps: u32) -> U128;
+}
+
+pub trait RestrictionApi {
+    fn is_restricted(&self, account_id: &AccountId) -> bool;
+    fn set_restricted(&mut self, account_id: &AccountId, is_restricted: bool);
+}
+
+pub trait SweatDefer {
+    fn defer_batch(&mut self, steps_batch: Vec<(AccountId, u32)>, holding_account_id: AccountId) -> PromiseOrValue<()>;
+}
+
+pub struct Payout {
+    pub amount_for_user: u128,
+    pub fee: u128,
+}
+
+impl From<u128> for Payout {
+    fn from(value: u128) -> Self {
+        let fee = (value * 5).div_ceil(100);
+
+        Self {
+            fee,
+            amount_for_user: value - fee,
+        }
+    }
+}

@@ -10,10 +10,8 @@ integration-test = ["dep:integration-utils", "dep:near-workspaces"]
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-integration-trait = { workspace = true }
 
 near-sdk = { workspace = true }
 near-contract-standards = { workspace = true }
 
-integration-utils = { workspace = true, optional = true }
 near-workspaces = { workspace = true, optional = true }

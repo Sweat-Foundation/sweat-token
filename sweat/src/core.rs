@@ -2,11 +2,11 @@ use near_contract_standards::{
     fungible_token::{core::FungibleTokenCore, resolver::FungibleTokenResolver},
     storage_management::{StorageBalance, StorageBalanceBounds, StorageManagement},
 };
-use near_sdk::{env, json_types::U128, near_bindgen, AccountId, PromiseOrValue};
+use near_sdk::{env, json_types::U128, near, AccountId, NearToken, PromiseOrValue};
 
 use crate::{Contract, ContractExt};
 
-#[near_bindgen]
+#[near]
 impl FungibleTokenCore for Contract {
     #[payable]
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>) {
@@ -37,7 +37,7 @@ impl FungibleTokenCore for Contract {
     }
 }
 
-#[near_bindgen]
+#[near]
 impl StorageManagement for Contract {
     #[payable]
     fn storage_deposit(&mut self, account_id: Option<AccountId>, registration_only: Option<bool>) -> StorageBalance {
@@ -45,7 +45,7 @@ impl StorageManagement for Contract {
     }
 
     #[payable]
-    fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
+    fn storage_withdraw(&mut self, amount: Option<NearToken>) -> StorageBalance {
         self.token.storage_withdraw(amount)
     }
 
@@ -63,7 +63,7 @@ impl StorageManagement for Contract {
     }
 }
 
-#[near_bindgen]
+#[near]
 impl FungibleTokenResolver for Contract {
     #[private]
     fn ft_resolve_transfer(&mut self, sender_id: AccountId, receiver_id: AccountId, amount: U128) -> U128 {
