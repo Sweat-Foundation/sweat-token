@@ -35,7 +35,7 @@ impl SweatApi for Contract {
     fn new(postfix: Option<String>) -> Self {
         Self {
             oracles: UnorderedSet::new(b"s"),
-            token: FungibleToken::new(b"t"), //, postfix),
+            token: FungibleToken::new(b"t", postfix),
             steps_since_tge: U64::from(0),
             denylist: UnorderedSet::new(b"d"),
         }

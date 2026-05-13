@@ -1,0 +1,31 @@
+[package]
+name = "near-contract-standards"
+version.workspace = true
+authors = ["Near Inc <hello@near.org>"]
+edition.workspace = true
+license.workspace = true
+categories.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+documentation = "https://docs.rs/near-contract-standards"
+description = """
+NEAR smart contracts standard library.
+"""
+
+[dependencies]
+near-sdk = { path = "../near-sdk", version = "~5.26.1", default-features = false, features = [
+    "legacy",
+] }
+
+[dev-dependencies]
+near-sdk = { path = "../near-sdk", default-features = false, features = [
+    "unit-testing",
+] }
+
+[features]
+default = []
+abi = ["near-sdk/__abi-generate"]
+
+[package.metadata.docs.rs]
+features = ["abi"]

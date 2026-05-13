@@ -6,6 +6,35 @@
 - Install Rust (>= 1.60.0) `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 - `rustup target add wasm32-unknown-unknown`
 
+#### 🪛 Vendored `near-contract-standards`
+
+The crate at `vendors/near-contract-standards/` is a vendored copy of the upstream
+[`near-contract-standards`](https://crates.io/crates/near-contract-standards) crate with
+local modifications (notably `LookupMapAdapter` for the SWEAT account-id storage layout).
+**The vendored directory is the source of truth** for our changes — edit it directly,
+commit. There is no separate patch file to keep in sync.
+
+To refresh the vendor from upstream — for example after bumping `near-sdk` in
+the workspace `Cargo.toml` — run:
+
+```bash
+make sync
+```
+
+The script:
+
+1. Reads the **currently** vendored version from `vendors/near-contract-standards/Cargo.toml`.
+2. Downloads that pristine version from crates.io and diffs it against the live vendor
+   — this captures every local modification, regardless of who made it.
+3. Reads the **target** version from `[workspace.dependencies] near-sdk = "..."`.
+4. Replaces `vendors/near-contract-standards/` with the target upstream.
+5. Re-applies the captured diff.
+
+If a hunk fails (upstream changed near our modification site), `patch` writes `*.rej`
+files and the script aborts. Inspect, resolve manually, commit the resolved state.
+The next `make sync` will derive a fresh diff from your resolved vendor — no
+separate patch file to regenerate.
+
 #### Build & Run tests
 
 ```rust

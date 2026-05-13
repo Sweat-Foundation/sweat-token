@@ -40,6 +40,9 @@ fmt: ##@Chores Format the code using rustfmt nightly.
 lint: ##@Chores Run lint checks with Clippy.
 	./scripts/lint.sh
 
+sync: ##@Chores Sync vendored near-contract-standards from upstream and re-apply my_custom_updates.patch.
+	./scripts/sync_vendor.sh
+
 HELP_FUN = \
     %help; while(<>){push@{$$help{$$2//'options'}},[$$1,$$3] \
     if/^([\w-_]+)\s*:.*\#\#(?:@(\w+))?\s(.*)$$/}; \
