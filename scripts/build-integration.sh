@@ -1,9 +1,13 @@
 #!/bin/bash
 set -eox pipefail
 
-echo ">> Building contract"
+echo ">> Building contract (integration-test feature)"
 
-rustup target add wasm32-unknown-unknown
-cargo build -p sweat --target wasm32-unknown-unknown --profile=contract --features integration-test
+OUT_DIR="integration-tests/target/integration-wasm"
+mkdir -p "$OUT_DIR"
 
-cp ./target/wasm32-unknown-unknown/contract/sweat.wasm res/sweat.wasm
+cargo near build non-reproducible-wasm \
+    --manifest-path contract/Cargo.toml \
+    --features integration-test \
+    --no-abi \
+    --out-dir "$OUT_DIR"

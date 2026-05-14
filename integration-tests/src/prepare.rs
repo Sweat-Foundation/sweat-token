@@ -2,9 +2,10 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 use near_workspaces::{network::Sandbox, types::NearToken, Account, AccountId, Contract, Worker};
-use serde_json::{json, Value};
+use serde_json::json;
 
 use crate::helpers::step;
+use crate::storage::{storage_balance_min, storage_deposit};
 
 const FT_POSTFIX: &str = ".u.sweat.testnet";
 const LONG_ACCOUNT_NAME: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -33,11 +34,11 @@ pub async fn prepare_contract(caller: &str) -> Result<Context> {
     let root = worker.root_account()?;
 
     step!(&tag, "deploying contracts");
-    let sweat = deploy(&worker, SWEAT_WASM).await?;
+    let sweat = deploy(&worker, integration_wasm_path(), "sweat").await?;
     step!(&tag, "  sweat → {}", sweat.id());
-    let claim = deploy(&worker, CLAIM_WASM).await?;
+    let claim = deploy(&worker, res_wasm_path(CLAIM_WASM), "claim").await?;
     step!(&tag, "  claim → {}", claim.id());
-    let stub = deploy(&worker, STUB_WASM).await?;
+    let stub = deploy(&worker, res_wasm_path(STUB_WASM), "stub").await?;
     step!(&tag, "  stub  → {}", stub.id());
 
     step!(&tag, "creating user accounts");
@@ -73,13 +74,27 @@ pub async fn prepare_contract(caller: &str) -> Result<Context> {
     })
 }
 
-async fn deploy(worker: &Worker<Sandbox>, wasm_name: &str) -> Result<Contract> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+fn integration_wasm_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join("integration-wasm")
+        .join(SWEAT_WASM)
+}
+
+fn res_wasm_path(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("res")
-        .join(wasm_name);
-    let bytes = std::fs::read(&path)
-        .map_err(|e| anyhow!("failed to read {}: {e}", path.display()))?;
+        .join(name)
+}
+
+async fn deploy(worker: &Worker<Sandbox>, path: PathBuf, label: &str) -> Result<Contract> {
+    let bytes = std::fs::read(&path).map_err(|e| {
+        anyhow!(
+            "failed to read {label} WASM at {} — did you run `make build-integration`? ({e})",
+            path.display()
+        )
+    })?;
     Ok(worker.dev_deploy(&bytes).await?)
 }
 
@@ -132,24 +147,5 @@ async fn init_claim(claim: &Contract, token_account_id: &AccountId) -> Result<()
         .await?
         .into_result()?;
 
-    Ok(())
-}
-
-async fn storage_balance_min(ft: &Contract) -> Result<NearToken> {
-    let bounds: Value = ft.view("storage_balance_bounds").await?.json()?;
-    let min_str = bounds
-        .get("min")
-        .and_then(Value::as_str)
-        .ok_or_else(|| anyhow!("storage_balance_bounds.min missing"))?;
-    Ok(NearToken::from_yoctonear(min_str.parse()?))
-}
-
-async fn storage_deposit(ft: &Contract, account_id: &AccountId, deposit: NearToken) -> Result<()> {
-    ft.call("storage_deposit")
-        .args_json(json!({ "account_id": account_id }))
-        .deposit(deposit)
-        .transact()
-        .await?
-        .into_result()?;
     Ok(())
 }

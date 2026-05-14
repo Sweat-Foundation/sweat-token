@@ -1,23 +1,22 @@
-use anyhow::Result;
-use near_sdk::json_types::U64;
-use sweat_model::SweatApiIntegration;
+use serde_json::json;
 
-use crate::prepare::{prepare_contract, IntegrationContext};
+use crate::helpers::step;
+use crate::prepare::prepare_contract;
 
+const TAG: &str = "test_formula";
 const EPS: f64 = 0.00001;
 
 #[tokio::test]
-async fn test_formula() -> Result<()> {
-    let mut context = prepare_contract().await?;
+async fn test_formula() -> anyhow::Result<()> {
+    let context = prepare_contract(TAG).await?;
 
-    let oracle = context.oracle().await?;
+    step!(TAG, "view get_steps_since_tge");
+    let steps_since_tge: String = context.sweat.view("get_steps_since_tge").await?.json()?;
+    step!(TAG, "  = {}", steps_since_tge);
+    assert_eq!(0_u64, steps_since_tge.parse::<u64>()?);
 
-    let steps = context.ft_contract().get_steps_since_tge().await?;
-
-    assert_eq!(0, steps.0);
-
-    let steps_to_convert = [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000];
-    let steps_from_tge = [
+    let steps_to_convert: [u32; 9] = [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000];
+    let steps_from_tge: [u64; 16] = [
         1,
         10,
         100,
@@ -33,33 +32,37 @@ async fn test_formula() -> Result<()> {
         1000000000000,
         10000000000000,
         100000000000000,
-        1000000000000000u64,
+        1000000000000000,
     ];
+
+    let total = steps_from_tge.len() * steps_to_convert.len();
+    step!(TAG, "iterating {} formula cases", total);
 
     let mut test_number = 0;
     for tge in steps_from_tge {
         for steps in steps_to_convert {
-            let formula_res = context
-                .ft_contract()
-                .formula(U64(tge), steps)
-                .with_user(&oracle)
+            let raw: String = context
+                .sweat
+                .view("formula")
+                .args_json(json!({ "steps_since_tge": tge.to_string(), "steps": steps }))
                 .await?
-                .0;
-
-            let formula_res = formula_res as f64 / 1e+18;
-
-            println!("{}. formula ({} {}) = {}", test_number, tge, steps, formula_res);
-
-            let diff = formula_res - TEST_RESULTS[test_number];
-            assert!(diff.abs() < EPS);
+                .json()?;
+            let value = raw.parse::<u128>()? as f64 / 1e18;
+            let expected = TEST_RESULTS[test_number];
+            let diff = value - expected;
+            assert!(
+                diff.abs() < EPS,
+                "case #{test_number} (tge={tge}, steps={steps}): expected {expected}, got {value} (diff {diff})"
+            );
             test_number += 1;
         }
     }
 
+    step!(TAG, "all {} cases passed", test_number);
     Ok(())
 }
 
-pub const TEST_RESULTS: [f64; 144] = [
+const TEST_RESULTS: [f64; 144] = [
     0.000_999_999_999_999_307,
     0.009_999_999_999_972_283,
     0.099_999_999_997_644_02,

@@ -2,11 +2,17 @@
 
 use near_sdk::{
     json_types::{U128, U64},
-    near_bindgen,
+    near,
 };
-use sweat_model::{IntegrationTestMethods, Payout, SweatApi};
 
-use crate::{Contract, ContractExt};
+use crate::{
+    api::{Payout, SweatApi},
+    Contract, ContractExt,
+};
+
+pub trait IntegrationTestMethods {
+    fn calculate_payout_with_fee_for_batch(&self, batch_size: u32, claim_amount: u32) -> (U128, U128);
+}
 
 #[near]
 impl IntegrationTestMethods for Contract {

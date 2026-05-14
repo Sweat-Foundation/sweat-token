@@ -1,7 +1,14 @@
 #![cfg(test)]
 
+mod callback_attack;
+mod defer;
+mod formula;
 mod helpers;
+mod mint;
+mod panic;
 mod prepare;
+mod storage;
+mod transfer;
 
 use serde_json::json;
 

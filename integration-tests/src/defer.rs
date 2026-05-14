@@ -1,53 +1,91 @@
-#![cfg(test)]
+use serde_json::json;
 
-use integration_utils::misc::ToNear;
-use sweat_model::{FungibleTokenCoreIntegration, IntegrationTestMethodsIntegration, SweatDeferIntegration};
+use crate::helpers::step;
+use crate::prepare::prepare_contract;
 
-use crate::prepare::{prepare_contract, IntegrationContext};
+const TAG: &str = "test_defer";
+const BATCH_SIZE: u32 = 135;
+const CLAIM_AMOUNT: u32 = 10_000;
 
 #[tokio::test]
 async fn test_defer() -> anyhow::Result<()> {
-    const BATCH_SIZE: u32 = 135;
-    const CLAIM_AMOUNT: u32 = 10_000;
+    let context = prepare_contract(TAG).await?;
 
-    let mut context = prepare_contract().await?;
-    let oracle = context.oracle().await?;
-    let alice = context.alice().await?;
+    step!(TAG, "view ft_balance_of(claim)");
+    let claim_balance_before: String = context
+        .sweat
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": context.claim.id() }))
+        .await?
+        .json()?;
+    step!(TAG, "  = {}", claim_balance_before);
+    assert_eq!(0_u128, claim_balance_before.parse::<u128>()?);
 
-    let claim_contract_account = context.claim_contract().as_account().to_near();
+    step!(
+        TAG,
+        "view calculate_payout_with_fee_for_batch(batch_size={BATCH_SIZE}, claim_amount={CLAIM_AMOUNT})"
+    );
+    let (total_fee, total_for_user): (String, String) = context
+        .sweat
+        .view("calculate_payout_with_fee_for_batch")
+        .args_json(json!({
+            "batch_size": BATCH_SIZE,
+            "claim_amount": CLAIM_AMOUNT,
+        }))
+        .await?
+        .json()?;
+    step!(TAG, "  total_fee={total_fee}, total_for_user={total_for_user}");
 
-    let holder_balance = context
-        .ft_contract()
-        .ft_balance_of(claim_contract_account.clone())
-        .await?;
+    let batch: Vec<_> = (0..BATCH_SIZE)
+        .map(|_| (context.alice.id(), CLAIM_AMOUNT))
+        .collect();
 
-    assert_eq!(holder_balance.0, 0);
-
-    let (total_fee, total_for_user) = context
-        .ft_contract()
-        .calculate_payout_with_fee_for_batch(BATCH_SIZE, CLAIM_AMOUNT)
-        .await?;
-
-    let batch: Vec<_> = (0..BATCH_SIZE).map(|_| (alice.to_near(), CLAIM_AMOUNT)).collect();
-
+    step!(
+        TAG,
+        "call defer_batch([(alice, {CLAIM_AMOUNT})] × {BATCH_SIZE}, holding=claim) [signer=oracle]"
+    );
     context
-        .ft_contract()
-        .defer_batch(batch, claim_contract_account.clone())
-        .with_user(&oracle)
-        .await?;
+        .oracle
+        .call(context.sweat.id(), "defer_batch")
+        .args_json(json!({
+            "steps_batch": batch,
+            "holding_account_id": context.claim.id(),
+        }))
+        .max_gas()
+        .transact()
+        .await?
+        .into_result()?;
 
-    let alice_balance = context.ft_contract().ft_balance_of(alice.to_near()).await?;
-    assert_eq!(0, alice_balance.0);
+    step!(TAG, "view ft_balance_of(alice)");
+    let alice_balance: String = context
+        .sweat
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": context.alice.id() }))
+        .await?
+        .json()?;
+    step!(TAG, "  = {}", alice_balance);
+    assert_eq!(0_u128, alice_balance.parse::<u128>()?);
 
-    let claim_contract_balance = context
-        .ft_contract()
-        .ft_balance_of(claim_contract_account.clone())
-        .await?;
+    step!(TAG, "view ft_balance_of(claim)");
+    let claim_balance: String = context
+        .sweat
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": context.claim.id() }))
+        .await?
+        .json()?;
+    step!(TAG, "  = {}", claim_balance);
+    assert_eq!(total_for_user, claim_balance);
 
-    let oracle_balance = context.ft_contract().ft_balance_of(oracle.to_near()).await?;
+    step!(TAG, "view ft_balance_of(oracle)");
+    let oracle_balance: String = context
+        .sweat
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": context.oracle.id() }))
+        .await?
+        .json()?;
+    step!(TAG, "  = {}", oracle_balance);
+    assert_eq!(total_fee, oracle_balance);
 
-    assert_eq!(oracle_balance, total_fee);
-    assert_eq!(claim_contract_balance, total_for_user);
-
+    step!(TAG, "done");
     Ok(())
 }

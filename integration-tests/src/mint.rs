@@ -1,40 +1,73 @@
-use integration_utils::misc::ToNear;
-use near_sdk::json_types::{U128, U64};
-use sweat_model::{FungibleTokenCoreIntegration, Payout, SweatApiIntegration};
+use serde_json::json;
 
-use crate::prepare::{prepare_contract, IntegrationContext};
+use crate::helpers::{payout, step};
+use crate::prepare::prepare_contract;
 
-const TARGET_BALANCE: u128 = 9999999976902174720;
+const TARGET_BALANCE: u128 = 9_999_999_976_902_174_720;
 const TARGET_STEPS_SINCE_TGE: u32 = 10_000;
+const TAG: &str = "test_mint";
 
 #[tokio::test]
 async fn test_mint() -> anyhow::Result<()> {
-    let mut context = prepare_contract().await?;
-    let user = context.alice().await?;
-    let oracle = context.oracle().await?;
+    let context = prepare_contract(TAG).await?;
 
-    let result = context.ft_contract().get_steps_since_tge().await?;
-    assert_eq!(result, U64(0));
+    step!(TAG, "view get_steps_since_tge");
+    let steps: String = context.sweat.view("get_steps_since_tge").await?.json()?;
+    step!(TAG, "  = {}", steps);
+    assert_eq!(0_u64, steps.parse::<u64>()?);
 
-    let result = context.ft_contract().formula(U64(0), TARGET_STEPS_SINCE_TGE).await?;
-    assert_eq!(result, U128(TARGET_BALANCE));
+    step!(TAG, "view formula(0, {})", TARGET_STEPS_SINCE_TGE);
+    let formula: String = context
+        .sweat
+        .view("formula")
+        .args_json(json!({ "steps_since_tge": "0", "steps": TARGET_STEPS_SINCE_TGE }))
+        .await?
+        .json()?;
+    step!(TAG, "  = {}", formula);
+    assert_eq!(TARGET_BALANCE, formula.parse::<u128>()?);
 
+    step!(TAG, "call record_batch([(alice, 10_000)]) [signer=oracle]");
     context
-        .ft_contract()
-        .record_batch(vec![(user.to_near(), 10_000u32)])
-        .with_user(&oracle)
-        .await?;
+        .oracle
+        .call(context.sweat.id(), "record_batch")
+        .args_json(json!({ "steps_batch": [[context.alice.id(), 10_000]] }))
+        .transact()
+        .await?
+        .into_result()?;
 
-    let target_payout = Payout::from(TARGET_BALANCE);
+    let (expected_amount_for_user, expected_fee) = payout(TARGET_BALANCE);
+    step!(
+        TAG,
+        "  expected payout: fee={}, amount_for_user={}",
+        expected_fee,
+        expected_amount_for_user
+    );
 
-    let result = context.ft_contract().ft_balance_of(oracle.to_near()).await?;
-    assert_eq!(result, U128(target_payout.fee));
+    step!(TAG, "view ft_balance_of(oracle)");
+    let oracle_balance: String = context
+        .sweat
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": context.oracle.id() }))
+        .await?
+        .json()?;
+    step!(TAG, "  = {}", oracle_balance);
+    assert_eq!(expected_fee, oracle_balance.parse::<u128>()?);
 
-    let result = context.ft_contract().ft_balance_of(user.to_near()).await?;
-    assert_eq!(result, U128(target_payout.amount_for_user));
+    step!(TAG, "view ft_balance_of(alice)");
+    let alice_balance: String = context
+        .sweat
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": context.alice.id() }))
+        .await?
+        .json()?;
+    step!(TAG, "  = {}", alice_balance);
+    assert_eq!(expected_amount_for_user, alice_balance.parse::<u128>()?);
 
-    let result = context.ft_contract().get_steps_since_tge().await?;
-    assert_eq!(result, U64(TARGET_STEPS_SINCE_TGE as u64));
+    step!(TAG, "view get_steps_since_tge");
+    let steps_after: String = context.sweat.view("get_steps_since_tge").await?.json()?;
+    step!(TAG, "  = {}", steps_after);
+    assert_eq!(u64::from(TARGET_STEPS_SINCE_TGE), steps_after.parse::<u64>()?);
 
+    step!(TAG, "done");
     Ok(())
 }

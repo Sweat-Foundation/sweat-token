@@ -1,60 +1,70 @@
-#![cfg(test)]
+use serde_json::json;
 
-use integration_utils::misc::ToNear;
-use near_sdk::{json_types::U128, serde_json::json};
-use sweat_model::FungibleTokenCoreIntegration;
-
-use crate::{
-    common::PanicFinder,
-    interface::common::ContractAccount,
-    prepare::{prepare_contract, IntegrationContext},
-};
+use crate::helpers::step;
+use crate::panic::PanicFinder;
+use crate::prepare::prepare_contract;
 
 #[tokio::test]
 async fn test_call_on_record_in_callback() -> anyhow::Result<()> {
-    let mut context = prepare_contract().await?;
+    const TAG: &str = "test_call_on_record_in_callback";
+    let context = prepare_contract(TAG).await?;
 
-    let alice = context.alice().await?;
+    step!(TAG, "view ft_balance_of(alice) [before attack]");
+    let balance_before: String = context
+        .sweat
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": context.alice.id() }))
+        .await?
+        .json()?;
+    step!(TAG, "  = {}", balance_before);
 
-    let alice_balance_before_attack = context.ft_contract().ft_balance_of(alice.to_near()).await?;
-    let ft_contract_id = context.ft_contract().account();
-
-    let target_amount = U128(1_000_000);
-    let result = alice
-        .call(context.stub_contract().id(), "exploit_on_record")
+    step!(TAG, "alice → stub.exploit_on_record(ft, 1_000_000)");
+    let result = context
+        .alice
+        .call(context.stub.id(), "exploit_on_record")
         .args_json(json!({
-            "ft_account_id": ft_contract_id,
-            "amount": target_amount,
+            "ft_account_id": context.sweat.id(),
+            "amount": "1000000",
         }))
         .max_gas()
         .transact()
         .await?
         .into_result()?;
 
-    assert!(result.has_panic("Method on_record is private"));
+    assert!(
+        result.has_panic("Method on_record is private"),
+        "expected nested panic \"Method on_record is private\" in receipts"
+    );
+    step!(TAG, "  ✓ nested panic caught");
 
-    let alice_balance_after_attack = context.ft_contract().ft_balance_of(alice.to_near()).await?;
-    assert_eq!(alice_balance_before_attack, alice_balance_after_attack);
+    step!(TAG, "view ft_balance_of(alice) [after attack]");
+    let balance_after: String = context
+        .sweat
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": context.alice.id() }))
+        .await?
+        .json()?;
+    step!(TAG, "  = {}", balance_after);
+    assert_eq!(balance_before, balance_after);
 
+    step!(TAG, "done");
     Ok(())
 }
 
 #[tokio::test]
 async fn test_call_on_record_directly() -> anyhow::Result<()> {
-    let mut context = prepare_contract().await?;
+    const TAG: &str = "test_call_on_record_directly";
+    let context = prepare_contract(TAG).await?;
 
-    let alice = context.alice().await?;
-
-    let intruder_id = alice.to_near();
+    step!(TAG, "sweat → sweat.on_record(...) [direct call, no preceding promise]");
     let result = context
-        .ft_contract()
-        .contract
+        .sweat
         .as_account()
-        .call(context.ft_contract().contract.id(), "on_record")
+        .call(context.sweat.id(), "on_record")
         .args_json(json!({
-            "receiver_id": intruder_id,
+            "receiver_id": context.alice.id(),
             "amount": "1000000",
-            "fee_account_id": intruder_id,
+            "fee_account_id": context.alice.id(),
             "fee": "2000000",
         }))
         .max_gas()
@@ -62,23 +72,28 @@ async fn test_call_on_record_directly() -> anyhow::Result<()> {
         .await?
         .into_result();
 
-    assert!(result.has_panic("Contract expected a result on the callback"));
+    assert!(
+        result.has_panic("Contract expected a single result on the callback"),
+        "expected panic \"Contract expected a single result on the callback\""
+    );
+    step!(TAG, "  ✓ panic caught");
 
+    step!(TAG, "done");
     Ok(())
 }
 
 #[tokio::test]
 async fn test_call_ft_resolve_transfer() -> anyhow::Result<()> {
-    let mut context = prepare_contract().await?;
+    const TAG: &str = "test_call_ft_resolve_transfer";
+    let context = prepare_contract(TAG).await?;
 
-    let alice = context.alice().await?;
-    let bob = context.bob().await?;
-
-    let result = alice
-        .call(context.ft_contract().contract.id(), "ft_resolve_transfer")
+    step!(TAG, "alice → sweat.ft_resolve_transfer(...) [private callback]");
+    let result = context
+        .alice
+        .call(context.sweat.id(), "ft_resolve_transfer")
         .args_json(json!({
-            "sender_id": alice.to_near(),
-            "receiver_id": bob.to_near(),
+            "sender_id": context.alice.id(),
+            "receiver_id": context.bob.id(),
             "amount": "1000000",
         }))
         .max_gas()
@@ -86,7 +101,12 @@ async fn test_call_ft_resolve_transfer() -> anyhow::Result<()> {
         .await?
         .into_result();
 
-    assert!(result.has_panic("Method ft_resolve_transfer is private"));
+    assert!(
+        result.has_panic("Method ft_resolve_transfer is private"),
+        "expected panic \"Method ft_resolve_transfer is private\""
+    );
+    step!(TAG, "  ✓ panic caught");
 
+    step!(TAG, "done");
     Ok(())
 }
