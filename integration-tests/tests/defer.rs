@@ -1,29 +1,31 @@
 use serde_json::json;
+use tracing::info;
 
-use crate::helpers::step;
-use crate::prepare::prepare_contract;
+mod common;
+use common::prepare::Context;
 
-const TAG: &str = "test_defer";
 const BATCH_SIZE: u32 = 135;
 const CLAIM_AMOUNT: u32 = 10_000;
 
 #[tokio::test]
+#[tracing::instrument]
 async fn test_defer() -> anyhow::Result<()> {
-    let context = prepare_contract(TAG).await?;
+    let context = Context::builder().with_oracle().with_claim().build().await?;
 
-    step!(TAG, "view ft_balance_of(claim)");
+    info!("view ft_balance_of(claim)");
     let claim_balance_before: String = context
         .sweat
         .view("ft_balance_of")
-        .args_json(json!({ "account_id": context.claim.id() }))
+        .args_json(json!({ "account_id": context.claim().id() }))
         .await?
         .json()?;
-    step!(TAG, "  = {}", claim_balance_before);
+    info!(value = %claim_balance_before, "claim balance before");
     assert_eq!(0_u128, claim_balance_before.parse::<u128>()?);
 
-    step!(
-        TAG,
-        "view calculate_payout_with_fee_for_batch(batch_size={BATCH_SIZE}, claim_amount={CLAIM_AMOUNT})"
+    info!(
+        batch_size = BATCH_SIZE,
+        claim_amount = CLAIM_AMOUNT,
+        "view calculate_payout_with_fee_for_batch"
     );
     let (total_fee, total_for_user): (String, String) = context
         .sweat
@@ -34,58 +36,59 @@ async fn test_defer() -> anyhow::Result<()> {
         }))
         .await?
         .json()?;
-    step!(TAG, "  total_fee={total_fee}, total_for_user={total_for_user}");
+    info!(%total_fee, %total_for_user, "payout breakdown");
 
     let batch: Vec<_> = (0..BATCH_SIZE)
         .map(|_| (context.alice.id(), CLAIM_AMOUNT))
         .collect();
 
-    step!(
-        TAG,
-        "call defer_batch([(alice, {CLAIM_AMOUNT})] × {BATCH_SIZE}, holding=claim) [signer=oracle]"
+    info!(
+        batch_size = BATCH_SIZE,
+        claim_amount = CLAIM_AMOUNT,
+        "call defer_batch(holding=claim) [signer=oracle]"
     );
     context
-        .oracle
+        .oracle()
         .call(context.sweat.id(), "defer_batch")
         .args_json(json!({
             "steps_batch": batch,
-            "holding_account_id": context.claim.id(),
+            "holding_account_id": context.claim().id(),
         }))
         .max_gas()
         .transact()
         .await?
         .into_result()?;
 
-    step!(TAG, "view ft_balance_of(alice)");
+    info!("view ft_balance_of(alice)");
     let alice_balance: String = context
         .sweat
         .view("ft_balance_of")
         .args_json(json!({ "account_id": context.alice.id() }))
         .await?
         .json()?;
-    step!(TAG, "  = {}", alice_balance);
+    info!(value = %alice_balance, "alice balance");
     assert_eq!(0_u128, alice_balance.parse::<u128>()?);
 
-    step!(TAG, "view ft_balance_of(claim)");
+    info!("view ft_balance_of(claim)");
     let claim_balance: String = context
         .sweat
         .view("ft_balance_of")
-        .args_json(json!({ "account_id": context.claim.id() }))
+        .args_json(json!({ "account_id": context.claim().id() }))
         .await?
         .json()?;
-    step!(TAG, "  = {}", claim_balance);
+    info!(value = %claim_balance, "claim balance");
     assert_eq!(total_for_user, claim_balance);
 
-    step!(TAG, "view ft_balance_of(oracle)");
+    info!("view ft_balance_of(oracle)");
     let oracle_balance: String = context
         .sweat
         .view("ft_balance_of")
-        .args_json(json!({ "account_id": context.oracle.id() }))
+        .args_json(json!({ "account_id": context.oracle().id() }))
         .await?
         .json()?;
-    step!(TAG, "  = {}", oracle_balance);
+    info!(value = %oracle_balance, "oracle balance");
     assert_eq!(total_fee, oracle_balance);
 
-    step!(TAG, "done");
+    info!("done");
     Ok(())
 }

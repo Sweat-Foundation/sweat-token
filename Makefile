@@ -34,6 +34,11 @@ integration: build-integration ##@Testing Run integration tests.
 
 int: integration ##@Testing Shorthand for `integration`
 
+integration-log: build-integration ##@Testing Run integration tests with logs streamed (serial). Override level via RUST_LOG.
+	cd integration-tests && RUST_LOG=$${RUST_LOG:-info,near_workspaces=warn} cargo test -- --nocapture --test-threads=1
+
+int-log: integration-log ##@Testing Shorthand for `integration-log`
+
 fmt: ##@Chores Format the code using rustfmt nightly.
 	cargo +nightly fmt --all
 
