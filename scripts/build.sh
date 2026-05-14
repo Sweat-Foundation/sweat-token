@@ -3,7 +3,6 @@ set -eox pipefail
 
 echo ">> Building contract"
 
-rustup target add wasm32-unknown-unknown
-cargo build -p sweat --target wasm32-unknown-unknown --profile=contract
-
-cp ./target/wasm32-unknown-unknown/contract/sweat.wasm res/sweat.wasm
+cargo near build non-reproducible-wasm \
+    --manifest-path contract/Cargo.toml \
+    --out-dir res

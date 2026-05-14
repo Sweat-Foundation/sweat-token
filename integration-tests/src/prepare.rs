@@ -1,94 +1,122 @@
-use anyhow::Result;
-use async_trait::async_trait;
-use integration_utils::misc::ToNear;
-use near_sdk::serde_json::json;
-use near_workspaces::{Account, Contract};
-use sweat_model::{StorageManagementIntegration, SweatApiIntegration, SweatContract};
+use std::path::PathBuf;
 
-const CLAIM_CONTRACT: &str = "sweat_claim";
-const HOLDING_STUB_CONTRACT: &str = "exploit_stub";
-const FT_CONTRACT: &str = "sweat";
+use anyhow::{anyhow, Result};
+use near_workspaces::{network::Sandbox, types::NearToken, Account, AccountId, Contract, Worker};
+use serde_json::{json, Value};
 
-pub type Context = integration_utils::context::Context<near_workspaces::network::Sandbox>;
+use crate::helpers::step;
 
-#[async_trait]
-pub trait IntegrationContext {
-    async fn oracle(&mut self) -> Result<Account>;
-    async fn alice(&mut self) -> Result<Account>;
-    async fn bob(&mut self) -> Result<Account>;
-    async fn long_account_name(&mut self) -> Result<Account>;
+const FT_POSTFIX: &str = ".u.sweat.testnet";
+const LONG_ACCOUNT_NAME: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const INITIAL_USER_BALANCE: NearToken = NearToken::from_near(10);
 
-    fn ft_contract(&self) -> SweatContract;
-    fn claim_contract(&self) -> &Contract;
-    fn stub_contract(&self) -> &Contract;
+const SWEAT_WASM: &str = "sweat.wasm";
+const CLAIM_WASM: &str = "sweat_claim.wasm";
+const STUB_WASM: &str = "exploit_stub.wasm";
+
+pub struct Context {
+    pub worker: Worker<Sandbox>,
+    pub sweat: Contract,
+    pub claim: Contract,
+    pub stub: Contract,
+    pub oracle: Account,
+    pub alice: Account,
+    pub bob: Account,
+    pub long: Account,
 }
 
-#[async_trait]
-impl IntegrationContext for Context {
-    async fn oracle(&mut self) -> Result<Account> {
-        self.account("oracle").await
-    }
+pub async fn prepare_contract(caller: &str) -> Result<Context> {
+    let tag = format!("{caller}/prepare");
 
-    async fn alice(&mut self) -> Result<Account> {
-        self.account("alice").await
-    }
+    step!(&tag, "booting sandbox");
+    let worker = near_workspaces::sandbox().await?;
+    let root = worker.root_account()?;
 
-    async fn bob(&mut self) -> Result<Account> {
-        self.account("bob").await
-    }
+    step!(&tag, "deploying contracts");
+    let sweat = deploy(&worker, SWEAT_WASM).await?;
+    step!(&tag, "  sweat → {}", sweat.id());
+    let claim = deploy(&worker, CLAIM_WASM).await?;
+    step!(&tag, "  claim → {}", claim.id());
+    let stub = deploy(&worker, STUB_WASM).await?;
+    step!(&tag, "  stub  → {}", stub.id());
 
-    async fn long_account_name(&mut self) -> Result<Account> {
-        self.account("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").await
-    }
+    step!(&tag, "creating user accounts");
+    let oracle = create_user(&root, "oracle").await?;
+    let alice = create_user(&root, "alice").await?;
+    let bob = create_user(&root, "bob").await?;
+    let long = create_user(&root, LONG_ACCOUNT_NAME).await?;
 
-    fn ft_contract(&self) -> SweatContract {
-        SweatContract {
-            contract: &self.contracts[FT_CONTRACT],
-        }
-    }
+    step!(&tag, "initializing sweat (new + add_oracle)");
+    init_sweat(&sweat, oracle.id()).await?;
+    step!(&tag, "initializing stub (new)");
+    init_stub(&stub).await?;
+    step!(&tag, "initializing claim (init + add_oracle)");
+    init_claim(&claim, sweat.id()).await?;
 
-    fn claim_contract(&self) -> &Contract {
-        &self.contracts[CLAIM_CONTRACT]
-    }
+    step!(&tag, "registering accounts for FT storage");
+    let min = storage_balance_min(&sweat).await?;
+    storage_deposit(&sweat, oracle.id(), min).await?;
+    storage_deposit(&sweat, alice.id(), min).await?;
+    storage_deposit(&sweat, long.id(), min).await?;
+    storage_deposit(&sweat, claim.id(), min).await?;
 
-    fn stub_contract(&self) -> &Contract {
-        &self.contracts[HOLDING_STUB_CONTRACT]
-    }
+    step!(&tag, "ready");
+    Ok(Context {
+        worker,
+        sweat,
+        claim,
+        stub,
+        oracle,
+        alice,
+        bob,
+        long,
+    })
 }
 
-pub async fn prepare_contract() -> Result<Context> {
-    let mut context = Context::new(
-        &[FT_CONTRACT, CLAIM_CONTRACT, HOLDING_STUB_CONTRACT],
-        true,
-        "build-integration".into(),
-    )
-    .await?;
-    let oracle = context.oracle().await?;
-    let alice = context.alice().await?;
-    let long = context.long_account_name().await?;
-    let token_account_id = context.ft_contract().contract.as_account().to_near();
+async fn deploy(worker: &Worker<Sandbox>, wasm_name: &str) -> Result<Contract> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("res")
+        .join(wasm_name);
+    let bytes = std::fs::read(&path)
+        .map_err(|e| anyhow!("failed to read {}: {e}", path.display()))?;
+    Ok(worker.dev_deploy(&bytes).await?)
+}
 
-    context.ft_contract().new(".u.sweat.testnet".to_string().into()).await?;
+async fn create_user(root: &Account, name: &str) -> Result<Account> {
+    Ok(root
+        .create_subaccount(name)
+        .initial_balance(INITIAL_USER_BALANCE)
+        .transact()
+        .await?
+        .into_result()?)
+}
 
-    context
-        .ft_contract()
-        .storage_deposit(oracle.to_near().into(), None)
-        .await?;
+async fn init_sweat(sweat: &Contract, oracle_id: &AccountId) -> Result<()> {
+    sweat
+        .call("new")
+        .args_json(json!({ "postfix": FT_POSTFIX }))
+        .transact()
+        .await?
+        .into_result()?;
 
-    context
-        .ft_contract()
-        .storage_deposit(alice.to_near().into(), None)
-        .await?;
+    sweat
+        .call("add_oracle")
+        .args_json(json!({ "account_id": oracle_id }))
+        .transact()
+        .await?
+        .into_result()?;
 
-    context
-        .ft_contract()
-        .storage_deposit(long.to_near().into(), None)
-        .await?;
+    Ok(())
+}
 
-    context.ft_contract().add_oracle(&oracle.to_near()).await?;
+async fn init_stub(stub: &Contract) -> Result<()> {
+    stub.call("new").transact().await?.into_result()?;
+    Ok(())
+}
 
-    let claim_contract_result = context
-        .claim_contract()
+async fn init_claim(claim: &Contract, token_account_id: &AccountId) -> Result<()> {
+    claim
         .call("init")
         .args_json(json!({ "token_account_id": token_account_id }))
         .max_gas()
@@ -96,20 +124,7 @@ pub async fn prepare_contract() -> Result<Context> {
         .await?
         .into_result()?;
 
-    println!("Initialized claim contract: {:?}", claim_contract_result);
-
-    let exploit_stup_contract_result = context
-        .stub_contract()
-        .call("new")
-        .max_gas()
-        .transact()
-        .await?
-        .into_result()?;
-
-    println!("Initialized exploit stub contract: {:?}", exploit_stup_contract_result);
-
-    context
-        .claim_contract()
+    claim
         .call("add_oracle")
         .args_json(json!({ "account_id": token_account_id }))
         .max_gas()
@@ -117,10 +132,24 @@ pub async fn prepare_contract() -> Result<Context> {
         .await?
         .into_result()?;
 
-    context
-        .ft_contract()
-        .storage_deposit(context.claim_contract().as_account().to_near().into(), None)
-        .await?;
+    Ok(())
+}
 
-    Ok(context)
+async fn storage_balance_min(ft: &Contract) -> Result<NearToken> {
+    let bounds: Value = ft.view("storage_balance_bounds").await?.json()?;
+    let min_str = bounds
+        .get("min")
+        .and_then(Value::as_str)
+        .ok_or_else(|| anyhow!("storage_balance_bounds.min missing"))?;
+    Ok(NearToken::from_yoctonear(min_str.parse()?))
+}
+
+async fn storage_deposit(ft: &Contract, account_id: &AccountId, deposit: NearToken) -> Result<()> {
+    ft.call("storage_deposit")
+        .args_json(json!({ "account_id": account_id }))
+        .deposit(deposit)
+        .transact()
+        .await?
+        .into_result()?;
+    Ok(())
 }

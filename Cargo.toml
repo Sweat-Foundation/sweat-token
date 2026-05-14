@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "contract",
-    # "integration-tests",
     "exploit-stub",
     "vendors/near-contract-standards",
 ]
@@ -9,12 +8,5 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-tokio = "1.28.0"
-anyhow = "1.0.75"
-async-trait = "0.1.74"
-
-near-units = "0.2.0"
-near-workspaces = "0.10.0"
-
 near-sdk = "5.26.1"
 near-contract-standards = { path = "vendors/near-contract-standards" }
