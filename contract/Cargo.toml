@@ -1,5 +1,5 @@
 [package]
-name = "sweat"
+name = "contract"
 version = "1.2.1"
 authors = []
 edition = "2021"
@@ -16,3 +16,7 @@ integration-test = []
 static_assertions = "1.1.0"
 near-sdk = { workspace = true }
 near-contract-standards = { workspace = true }
+near-plugins = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }

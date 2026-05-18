@@ -27,7 +27,7 @@ cov: ##@Testing Run unit tests with coverage.
 	cargo llvm-cov --hide-instantiations --open
 
 test: ##@Testing Run unit tests.
-	cargo test --package sweat
+	cargo test --package contract
 
 integration: build-integration ##@Testing Run integration tests.
 	cd integration-tests && cargo test

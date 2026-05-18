@@ -6,16 +6,10 @@ use near_sdk::{
     AccountId, PromiseOrValue,
 };
 
-#[cfg(feature = "integration-test")]
-pub struct SweatContract<'a> {
-    pub contract: &'a near_workspaces::Contract,
-}
-
 pub trait SweatApi {
     fn new(postfix: Option<String>) -> Self;
     fn add_oracle(&mut self, account_id: &AccountId);
     fn remove_oracle(&mut self, account_id: &AccountId);
-    fn get_oracles(&self) -> Vec<AccountId>;
     fn tge_mint(&mut self, account_id: &AccountId, amount: U128);
     fn tge_mint_batch(&mut self, batch: Vec<(AccountId, U128)>);
     fn burn(&mut self, amount: &U128);

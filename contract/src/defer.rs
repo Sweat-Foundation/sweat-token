@@ -8,22 +8,19 @@ use near_sdk::{
     AccountId, Gas, NearToken, Promise, PromiseOrValue,
 };
 
-use crate::{api::SweatDefer, internal_deposit, Contract, ContractExt};
+use crate::{api::SweatDefer, internal_deposit, Contract, ContractExt, Role};
+use near_plugins::{access_control_any, AccessControlRole, AccessControllable};
 
 const GAS_FOR_DEFER_CALLBACK: Gas = Gas::from_tgas(5);
 const GAS_FOR_DEFER: Gas = Gas::from_tgas(30);
 
 #[near]
 impl SweatDefer for Contract {
+    #[access_control_any(roles(Role::Oracle))]
     fn defer_batch(&mut self, steps_batch: Vec<(AccountId, u32)>, holding_account_id: AccountId) -> PromiseOrValue<()> {
         require!(
             env::prepaid_gas() > GAS_FOR_DEFER,
             "Not enough gas to complete the operation"
-        );
-
-        require!(
-            self.oracles.contains(&env::predecessor_account_id()),
-            "Unauthorized access! Only oracle can call that!"
         );
 
         let mut accounts_tokens: Vec<(AccountId, U128)> = Vec::new();

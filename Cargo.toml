@@ -10,3 +10,4 @@ resolver = "2"
 [workspace.dependencies]
 near-sdk = "5.26.1"
 near-contract-standards = { path = "vendors/near-contract-standards" }
+near-plugins = { git = "https://github.com/near/near-plugins.git", tag = "v0.5.1" }
