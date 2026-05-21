@@ -115,14 +115,11 @@ async fn test_acl_record_batch() -> anyhow::Result<()> {
 async fn test_acl_defer_batch() -> anyhow::Result<()> {
     let context = Context::builder().with_claim().build().await?;
 
-    info!("call defer_batch([(alice, 10_000)], holding=claim) [signer=alice, unauthorized]");
+    info!("call defer_batch([(alice, 10_000)]) [signer=alice, unauthorized]");
     let result = context
         .alice
         .call(context.sweat.id(), "defer_batch")
-        .args_json(json!({
-            "steps_batch": [[context.alice.id(), 10_000]],
-            "holding_account_id": context.claim().id(),
-        }))
+        .args_json(json!({ "steps_batch": [[context.alice.id(), 10_000]] }))
         .max_gas()
         .transact()
         .await?
@@ -144,14 +141,11 @@ async fn test_acl_defer_batch() -> anyhow::Result<()> {
     assert_eq!(granted, Some(true));
     info!("acl_grant_role: {granted:?}");
 
-    info!("call defer_batch([(alice, 10_000)], holding=claim) [signer=alice, authorized]");
+    info!("call defer_batch([(alice, 10_000)]) [signer=alice, authorized]");
     let result = context
         .alice
         .call(context.sweat.id(), "defer_batch")
-        .args_json(json!({
-            "steps_batch": [[context.alice.id(), 10_000]],
-            "holding_account_id": context.claim().id(),
-        }))
+        .args_json(json!({ "steps_batch": [[context.alice.id(), 10_000]] }))
         .max_gas()
         .transact()
         .await?

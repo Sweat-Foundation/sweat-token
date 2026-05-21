@@ -104,10 +104,24 @@ impl ContextBuilder {
         let sweat = deploy(&worker, sweat_wasm_path(), "sweat", SWEAT_WASM_ENV).await?;
         info!(id = %sweat.id(), "sweat deployed");
 
+        // Deploy the claim contract before initializing sweat so its account id
+        // can be baked in as the fixed deferred-minting holding account.
+        let claim = if self.claim {
+            info!("deploying claim");
+            let claim = deploy(&worker, claim_wasm_path(), "claim", CLAIM_WASM_ENV).await?;
+            info!(id = %claim.id(), "claim deployed");
+            Some(claim)
+        } else {
+            None
+        };
+
         info!("initializing sweat (new)");
         sweat
             .call("new")
-            .args_json(json!({ "postfix": FT_POSTFIX }))
+            .args_json(json!({
+                "postfix": FT_POSTFIX,
+                "holding_account_id": claim.as_ref().map(Contract::id),
+            }))
             .transact()
             .await?
             .into_result()?;
@@ -140,16 +154,12 @@ impl ContextBuilder {
             None
         };
 
-        let claim = if self.claim {
-            info!("deploying + initializing claim");
-            let claim = deploy(&worker, claim_wasm_path(), "claim", CLAIM_WASM_ENV).await?;
-            info!(id = %claim.id(), "claim deployed");
-            init_claim(&claim, sweat.id()).await?;
+        // Finish claim setup now that sweat is initialized.
+        if let Some(claim) = &claim {
+            info!("initializing claim");
+            init_claim(claim, sweat.id()).await?;
             storage_deposit(&sweat, claim.id(), min).await?;
-            Some(claim)
-        } else {
-            None
-        };
+        }
 
         let stub = if self.stub {
             info!("deploying + initializing stub");

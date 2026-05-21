@@ -38,14 +38,11 @@ async fn happy_flow() -> anyhow::Result<()> {
     info!(value = %balance, "alice balance");
     assert_eq!(100_000_000_u128, balance.parse::<u128>()?);
 
-    info!("call defer_batch([(alice, 1000)], holding=claim) [signer=oracle]");
+    info!("call defer_batch([(alice, 1000)]) [signer=oracle]");
     context
         .oracle()
         .call(context.sweat.id(), "defer_batch")
-        .args_json(json!({
-            "steps_batch": [[context.alice.id(), 1000]],
-            "holding_account_id": context.claim().id(),
-        }))
+        .args_json(json!({ "steps_batch": [[context.alice.id(), 1000]] }))
         .max_gas()
         .transact()
         .await?

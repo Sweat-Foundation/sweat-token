@@ -18,11 +18,19 @@ const GAS_FOR_DEFER: Gas = Gas::from_tgas(30);
 impl SweatDefer for Contract {
     #[access_control_any(roles(Role::Oracle))]
     #[pause(name = "minting")]
-    fn defer_batch(&mut self, steps_batch: Vec<(AccountId, u32)>, holding_account_id: AccountId) -> PromiseOrValue<()> {
+    fn defer_batch(&mut self, steps_batch: Vec<(AccountId, u32)>) -> PromiseOrValue<()> {
         require!(
             env::prepaid_gas() > GAS_FOR_DEFER,
             "Not enough gas to complete the operation"
         );
+
+        // F-03: the holding account is a fixed, super-admin-configured value —
+        // never an Oracle-supplied argument — so deferred mints cannot be
+        // redirected to an arbitrary contract that skips staging.
+        let holding_account_id = self
+            .holding_account_id
+            .clone()
+            .unwrap_or_else(|| panic_str("Holding account is not set"));
 
         let mut accounts_tokens: Vec<(AccountId, U128)> = Vec::new();
         let mut total_effective: U128 = U128(0);

@@ -4,9 +4,11 @@ use near_sdk::{
 };
 
 pub trait SweatApi {
-    fn new(postfix: Option<String>) -> Self;
+    fn new(postfix: Option<String>, holding_account_id: Option<AccountId>) -> Self;
     fn add_oracle(&mut self, account_id: &AccountId);
     fn remove_oracle(&mut self, account_id: &AccountId);
+    fn set_holding_account_id(&mut self, account_id: AccountId);
+    fn get_holding_account_id(&self) -> Option<AccountId>;
     fn tge_mint(&mut self, account_id: &AccountId, amount: U128);
     fn tge_mint_batch(&mut self, batch: Vec<(AccountId, U128)>);
     fn burn(&mut self, amount: U128);
@@ -21,7 +23,7 @@ pub trait RestrictionApi {
 }
 
 pub trait SweatDefer {
-    fn defer_batch(&mut self, steps_batch: Vec<(AccountId, u32)>, holding_account_id: AccountId) -> PromiseOrValue<()>;
+    fn defer_batch(&mut self, steps_batch: Vec<(AccountId, u32)>) -> PromiseOrValue<()>;
 }
 
 pub struct Payout {

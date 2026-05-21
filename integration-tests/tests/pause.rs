@@ -218,14 +218,11 @@ async fn test_pause_minting() -> anyhow::Result<()> {
     assert!(result.has_panic("Method is paused"));
     info!("record_batch: {result:?}");
 
-    info!("call defer_batch([(alice, 10_000)], holding=alice) [signer=oracle]");
+    info!("call defer_batch([(alice, 10_000)]) [signer=oracle]");
     let result = context
         .oracle()
         .call(context.sweat.id(), "defer_batch")
-        .args_json(json!({
-            "steps_batch": [[context.alice.id(), 10_000]],
-            "holding_account_id": context.alice.id(),
-        }))
+        .args_json(json!({ "steps_batch": [[context.alice.id(), 10_000]] }))
         .max_gas()
         .transact()
         .await?
