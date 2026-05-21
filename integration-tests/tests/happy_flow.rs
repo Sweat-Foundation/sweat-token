@@ -2,6 +2,7 @@ use serde_json::json;
 use tracing::info;
 
 mod common;
+use common::helpers::payout;
 use common::prepare::Context;
 
 #[tokio::test]
@@ -9,24 +10,26 @@ use common::prepare::Context;
 async fn happy_flow() -> anyhow::Result<()> {
     let context = Context::builder().with_oracle().with_claim().build().await?;
 
-    info!("view formula(steps_since_tge=100000, steps=100)");
+    info!("view formula(steps_since_tge=0, steps=100)");
     let formula: String = context
         .sweat
         .view("formula")
-        .args_json(json!({ "steps_since_tge": "100000", "steps": 100 }))
+        .args_json(json!({ "steps_since_tge": "0", "steps": 100 }))
         .await?
         .json()?;
     info!(value = %formula, "formula result");
-    assert_eq!(99_999_995_378_125_008_u128, formula.parse::<u128>()?);
+    let minted = formula.parse::<u128>()?;
 
-    info!("call tge_mint(alice, 100_000_000) [signer=sweat]");
+    info!("call record_batch([(alice, 100)]) [signer=oracle]");
     context
-        .sweat
-        .call("tge_mint")
-        .args_json(json!({ "account_id": context.alice.id(), "amount": "100000000" }))
+        .oracle()
+        .call(context.sweat.id(), "record_batch")
+        .args_json(json!({ "steps_batch": [[context.alice.id(), 100]] }))
         .transact()
         .await?
         .into_result()?;
+
+    let (expected_amount_for_user, _expected_fee) = payout(minted);
 
     info!("view ft_balance_of(alice)");
     let balance: String = context
@@ -36,7 +39,7 @@ async fn happy_flow() -> anyhow::Result<()> {
         .await?
         .json()?;
     info!(value = %balance, "alice balance");
-    assert_eq!(100_000_000_u128, balance.parse::<u128>()?);
+    assert_eq!(expected_amount_for_user, balance.parse::<u128>()?);
 
     info!("call defer_batch([(alice, 1000)]) [signer=oracle]");
     context

@@ -9,8 +9,6 @@ pub trait SweatApi {
     fn remove_oracle(&mut self, account_id: &AccountId);
     fn set_holding_account_id(&mut self, account_id: AccountId);
     fn get_holding_account_id(&self) -> Option<AccountId>;
-    fn tge_mint(&mut self, account_id: &AccountId, amount: U128);
-    fn tge_mint_batch(&mut self, batch: Vec<(AccountId, U128)>);
     fn burn(&mut self, amount: U128);
     fn get_steps_since_tge(&self) -> U64;
     fn record_batch(&mut self, steps_batch: Vec<(AccountId, u32)>);
