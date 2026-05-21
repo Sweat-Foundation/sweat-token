@@ -54,6 +54,8 @@ impl StorageManagement for Contract {
 
     #[payable]
     fn storage_unregister(&mut self, force: Option<bool>) -> bool {
+        self.assert_not_in_denylist(vec![&env::predecessor_account_id()]);
+
         self.token.internal_storage_unregister(force).is_some()
     }
 

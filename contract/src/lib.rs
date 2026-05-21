@@ -101,6 +101,8 @@ impl SweatApi for Contract {
 
     #[pause(name = "token")]
     fn burn(&mut self, amount: U128) {
+        self.assert_not_in_denylist(vec![&env::predecessor_account_id()]);
+
         self.token.internal_withdraw(&env::predecessor_account_id(), amount.0);
         FtBurn {
             amount,
