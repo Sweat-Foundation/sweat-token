@@ -8,6 +8,4 @@ mkdir -p "$OUT_DIR"
 
 cargo near build non-reproducible-wasm \
     --manifest-path contract/Cargo.toml \
-    --features integration-test \
-    --no-abi \
     --out-dir "$OUT_DIR"

@@ -187,7 +187,7 @@ fn sweat_wasm_path() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("target")
             .join("integration-wasm")
-            .join("sweat.wasm"),
+            .join("contract.wasm"),
     )
 }
 

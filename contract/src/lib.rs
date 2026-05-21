@@ -7,8 +7,9 @@ use near_contract_standards::fungible_token::{
     metadata::{FungibleTokenMetadata, FungibleTokenMetadataProvider},
     Balance, FungibleToken,
 };
-use near_plugins::{access_control, access_control_any, AccessControlRole, AccessControllable};
+use near_plugins::{access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable};
 use near_sdk::{
+    borsh::BorshDeserialize,
     collections::UnorderedSet,
     env,
     json_types::{U128, U64},
@@ -27,11 +28,14 @@ mod math;
 #[serde(crate = "near_sdk::serde")]
 pub enum Role {
     Oracle,
+    PauseManager,
+    UnpauseManager,
 }
 
 #[near(contract_state)]
 #[access_control(role_type(Role))]
-#[derive(PanicOnDefault)]
+#[derive(Pausable, PanicOnDefault)]
+#[pausable(pause_roles(Role::PauseManager), unpause_roles(Role::UnpauseManager))]
 pub struct Contract {
     oracles: UnorderedSet<AccountId>,
     token: FungibleToken,
@@ -95,6 +99,7 @@ impl SweatApi for Contract {
         }
     }
 
+    #[pause(name = "token")]
     fn burn(&mut self, amount: U128) {
         self.token.internal_withdraw(&env::predecessor_account_id(), amount.0);
         FtBurn {
@@ -110,6 +115,7 @@ impl SweatApi for Contract {
     }
 
     #[access_control_any(roles(Role::Oracle))]
+    #[pause(name = "minting")]
     fn record_batch(&mut self, steps_batch: Vec<(AccountId, u32)>) {
         let mut oracle_fee: U128 = U128(0);
         let mut sweats: Vec<U128> = Vec::with_capacity(steps_batch.len() + 1);

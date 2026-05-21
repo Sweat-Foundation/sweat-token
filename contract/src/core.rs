@@ -2,6 +2,7 @@ use near_contract_standards::{
     fungible_token::{core::FungibleTokenCore, resolver::FungibleTokenResolver},
     storage_management::{StorageBalance, StorageBalanceBounds, StorageManagement},
 };
+use near_plugins::{pause, Pausable};
 use near_sdk::{env, json_types::U128, near, AccountId, NearToken, PromiseOrValue};
 
 use crate::{Contract, ContractExt};
@@ -9,6 +10,7 @@ use crate::{Contract, ContractExt};
 #[near]
 impl FungibleTokenCore for Contract {
     #[payable]
+    #[pause(name = "token")]
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>) {
         self.assert_not_in_denylist(vec![&env::predecessor_account_id(), &receiver_id]);
 
@@ -16,6 +18,7 @@ impl FungibleTokenCore for Contract {
     }
 
     #[payable]
+    #[pause(name = "token")]
     fn ft_transfer_call(
         &mut self,
         receiver_id: AccountId,

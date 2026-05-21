@@ -38,9 +38,7 @@ async fn test_defer() -> anyhow::Result<()> {
         .json()?;
     info!(%total_fee, %total_for_user, "payout breakdown");
 
-    let batch: Vec<_> = (0..BATCH_SIZE)
-        .map(|_| (context.alice.id(), CLAIM_AMOUNT))
-        .collect();
+    let batch: Vec<_> = (0..BATCH_SIZE).map(|_| (context.alice.id(), CLAIM_AMOUNT)).collect();
 
     info!(
         batch_size = BATCH_SIZE,
