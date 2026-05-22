@@ -24,9 +24,6 @@ impl SweatDefer for Contract {
             "Not enough gas to complete the operation"
         );
 
-        // F-03: the holding account is a fixed, super-admin-configured value —
-        // never an Oracle-supplied argument — so deferred mints cannot be
-        // redirected to an arbitrary contract that skips staging.
         let holding_account_id = self
             .holding_account_id
             .clone()
@@ -35,10 +32,12 @@ impl SweatDefer for Contract {
         let mut accounts_tokens: Vec<(AccountId, U128)> = Vec::new();
         let mut total_effective: U128 = U128(0);
         let mut total_fee: U128 = U128(0);
+        let mut steps_increment: u64 = 0;
 
         for (account_id, step_count) in steps_batch {
             let (amount, fee) = self.calculate_tokens_amount(step_count);
             self.steps_since_tge.0 += u64::from(step_count);
+            steps_increment += u64::from(step_count);
 
             accounts_tokens.push((account_id, U128(amount)));
             total_effective.0 += amount;
@@ -68,6 +67,7 @@ impl SweatDefer for Contract {
                         total_effective,
                         env::predecessor_account_id(),
                         total_fee,
+                        steps_increment,
                     ),
             )
             .into()
@@ -76,15 +76,32 @@ impl SweatDefer for Contract {
 
 #[ext_contract(ext_ft_transfer_callback)]
 pub trait FungibleTokenTransferCallback {
-    fn on_record(&mut self, receiver_id: AccountId, amount: U128, fee_account_id: AccountId, fee: U128);
+    fn on_record(
+        &mut self,
+        receiver_id: AccountId,
+        amount: U128,
+        fee_account_id: AccountId,
+        fee: U128,
+        steps_increment: u64,
+    );
 }
 
 #[near]
 impl FungibleTokenTransferCallback for Contract {
     #[private]
-    fn on_record(&mut self, receiver_id: AccountId, amount: U128, fee_account_id: AccountId, fee: U128) {
+    fn on_record(
+        &mut self,
+        receiver_id: AccountId,
+        amount: U128,
+        fee_account_id: AccountId,
+        fee: U128,
+        steps_increment: u64,
+    ) {
         if !is_promise_success() {
-            panic_str("Failed to record data in holding account");
+            self.steps_since_tge.0 -= steps_increment;
+            env::log_str("Failed to record data in holding account; rolled back steps counter");
+
+            return;
         }
 
         let mut events: Vec<FtMint> = Vec::with_capacity(2);

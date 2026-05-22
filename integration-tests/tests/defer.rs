@@ -225,3 +225,110 @@ async fn test_set_holding_account_id_rejects_non_admin() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// A successful `defer_batch` advances `steps_since_tge` by the batch's total
+/// step count — the x-axis of the emission curve must track minted steps.
+#[tokio::test]
+#[tracing::instrument]
+async fn test_defer_batch_advances_steps_on_success() -> anyhow::Result<()> {
+    let context = Context::builder().with_oracle().with_claim().build().await?;
+
+    info!("view get_steps_since_tge [before]");
+    let steps_before: String = context.sweat.view("get_steps_since_tge").await?.json()?;
+    assert_eq!(steps_before.parse::<u64>()?, 0);
+    info!(value = %steps_before, "steps before");
+
+    info!("call defer_batch([(alice, {CLAIM_AMOUNT})]) [signer=oracle]");
+    context
+        .oracle()
+        .call(context.sweat.id(), "defer_batch")
+        .args_json(json!({ "steps_batch": [[context.alice.id(), CLAIM_AMOUNT]] }))
+        .max_gas()
+        .transact()
+        .await?
+        .into_result()?;
+
+    info!("view get_steps_since_tge [after]");
+    let steps_after: String = context.sweat.view("get_steps_since_tge").await?.json()?;
+    assert_eq!(
+        steps_after.parse::<u64>()?,
+        u64::from(CLAIM_AMOUNT),
+        "steps_since_tge must advance by the batch step count on success"
+    );
+    info!(value = %steps_after, "steps after");
+
+    info!("done");
+    Ok(())
+}
+
+/// A failed `record_batch_for_hold` cross-contract call must not advance
+/// `steps_since_tge`: the `on_record` callback has to roll the increment back.
+/// The holding account is re-pointed at Alice — a plain account with no
+/// contract — so the XCC fails.
+#[tokio::test]
+#[tracing::instrument]
+async fn test_defer_batch_rolls_back_steps_on_failed_record() -> anyhow::Result<()> {
+    let context = Context::builder().with_oracle().with_claim().build().await?;
+
+    info!("view get_steps_since_tge [before]");
+    let steps_before: String = context.sweat.view("get_steps_since_tge").await?.json()?;
+    assert_eq!(steps_before.parse::<u64>()?, 0);
+    info!(value = %steps_before, "steps before");
+
+    info!("call set_holding_account_id(alice) — a contractless account [signer=contract]");
+    context
+        .sweat
+        .call("set_holding_account_id")
+        .args_json(json!({ "account_id": context.alice.id() }))
+        .transact()
+        .await?
+        .into_result()?;
+
+    info!("call defer_batch([(alice, {CLAIM_AMOUNT})]) [signer=oracle] — record XCC will fail");
+    let outcome = context
+        .oracle()
+        .call(context.sweat.id(), "defer_batch")
+        .args_json(json!({ "steps_batch": [[context.alice.id(), CLAIM_AMOUNT]] }))
+        .max_gas()
+        .transact()
+        .await?;
+    // Callback must return cleanly on the failed branch — a panic would revert the rollback.
+    outcome.clone().into_result()?;
+
+    info!("assert the failure branch ran");
+    assert!(
+        outcome
+            .logs()
+            .iter()
+            .any(|log| log.contains("rolled back steps counter")),
+        "expected the on_record failure branch to log the rollback"
+    );
+
+    info!("view get_steps_since_tge [after failed defer]");
+    let steps_after: String = context.sweat.view("get_steps_since_tge").await?.json()?;
+    assert_eq!(
+        steps_after.parse::<u64>()?,
+        0,
+        "steps_since_tge must be rolled back after a failed record XCC"
+    );
+    info!(value = %steps_after, "steps after");
+
+    info!("view ft_balance_of(alice) + ft_balance_of(oracle)");
+    let alice_balance: String = context
+        .sweat
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": context.alice.id() }))
+        .await?
+        .json()?;
+    let oracle_balance: String = context
+        .sweat
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": context.oracle().id() }))
+        .await?
+        .json()?;
+    assert_eq!(alice_balance, "0", "no tokens may be minted on a failed defer");
+    assert_eq!(oracle_balance, "0", "no fee may be minted on a failed defer");
+
+    info!("done");
+    Ok(())
+}

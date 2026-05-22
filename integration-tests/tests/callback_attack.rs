@@ -67,6 +67,7 @@ async fn test_call_on_record_directly() -> anyhow::Result<()> {
             "amount": "1000000",
             "fee_account_id": context.alice.id(),
             "fee": "2000000",
+            "steps_increment": 0,
         }))
         .max_gas()
         .transact()
