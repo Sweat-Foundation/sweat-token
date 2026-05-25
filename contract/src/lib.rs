@@ -23,6 +23,7 @@ mod core;
 mod defer;
 mod integration;
 mod math;
+mod migration;
 
 #[derive(AccessControlRole, Deserialize, Serialize, Clone, Copy)]
 #[serde(crate = "near_sdk::serde")]
@@ -37,7 +38,6 @@ pub enum Role {
 #[derive(Pausable, PanicOnDefault)]
 #[pausable(pause_roles(Role::PauseManager), unpause_roles(Role::UnpauseManager))]
 pub struct Contract {
-    oracles: UnorderedSet<AccountId>,
     token: FungibleToken,
     steps_since_tge: U64,
     denylist: UnorderedSet<AccountId>,
@@ -51,7 +51,6 @@ impl SweatApi for Contract {
     #[init]
     fn new(postfix: Option<String>, holding_account_id: Option<AccountId>) -> Self {
         let mut contract = Self {
-            oracles: UnorderedSet::new(b"s"),
             token: FungibleToken::new(b"t", postfix),
             steps_since_tge: U64::from(0),
             denylist: UnorderedSet::new(b"d"),
