@@ -184,9 +184,6 @@ impl ContextBuilder {
     }
 }
 
-/// Resolve a WASM path, honouring the given env var as an override.
-/// Relative paths in the env var are interpreted relative to the test
-/// process's cwd (usually the `integration-tests/` crate dir).
 fn wasm_path(env_var: &str, default: PathBuf) -> PathBuf {
     std::env::var_os(env_var).map(PathBuf::from).unwrap_or(default)
 }

@@ -88,8 +88,6 @@ async fn test_defer() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// `defer_batch` must refuse to run until the super admin has configured a
-/// holding account — there is no implicit default to fall back to.
 #[tokio::test]
 #[tracing::instrument]
 async fn test_defer_batch_panics_when_holding_account_unset() -> anyhow::Result<()> {
@@ -115,8 +113,6 @@ async fn test_defer_batch_panics_when_holding_account_unset() -> anyhow::Result<
     Ok(())
 }
 
-/// The super admin can re-point the holding account via `set_holding_account_id`,
-/// and `defer_batch` immediately stages deferred mints through the new account.
 #[tokio::test]
 #[tracing::instrument]
 async fn test_set_holding_account_id_updates_defer_target() -> anyhow::Result<()> {
@@ -156,7 +152,7 @@ async fn test_set_holding_account_id_updates_defer_target() -> anyhow::Result<()
         }))
         .await?
         .json()?;
-    // Mirror `Payout::from`: fee is 5% rounded up, the rest goes to the holder.
+
     let minted: u128 = minted_raw.parse()?;
     let total_fee = (minted * 5).div_ceil(100);
     let total_for_user = minted - total_fee;
@@ -200,8 +196,6 @@ async fn test_set_holding_account_id_updates_defer_target() -> anyhow::Result<()
     Ok(())
 }
 
-/// `set_holding_account_id` is super-admin-only (`#[private]`); a regular account
-/// cannot re-point the holding account.
 #[tokio::test]
 #[tracing::instrument]
 async fn test_set_holding_account_id_rejects_non_admin() -> anyhow::Result<()> {
@@ -226,8 +220,6 @@ async fn test_set_holding_account_id_rejects_non_admin() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// A successful `defer_batch` advances `steps_since_tge` by the batch's total
-/// step count — the x-axis of the emission curve must track minted steps.
 #[tokio::test]
 #[tracing::instrument]
 async fn test_defer_batch_advances_steps_on_success() -> anyhow::Result<()> {
@@ -261,10 +253,6 @@ async fn test_defer_batch_advances_steps_on_success() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// A failed `record_batch_for_hold` cross-contract call must not advance
-/// `steps_since_tge`: the `on_record` callback has to roll the increment back.
-/// The holding account is re-pointed at Alice — a plain account with no
-/// contract — so the XCC fails.
 #[tokio::test]
 #[tracing::instrument]
 async fn test_defer_batch_rolls_back_steps_on_failed_record() -> anyhow::Result<()> {
@@ -292,7 +280,7 @@ async fn test_defer_batch_rolls_back_steps_on_failed_record() -> anyhow::Result<
         .max_gas()
         .transact()
         .await?;
-    // Callback must return cleanly on the failed branch — a panic would revert the rollback.
+
     outcome.clone().into_result()?;
 
     info!("assert the failure branch ran");

@@ -5,7 +5,6 @@ use tracing::info;
 mod common;
 use common::{panic::PanicFinder, prepare::Context, storage::register_for_storage};
 
-/// Mint tokens to alice, then add her to the contract denylist.
 async fn mint_and_restrict(context: &Context) -> anyhow::Result<()> {
     info!("call record_batch([(alice, 10_000)]) [signer=oracle]");
     context

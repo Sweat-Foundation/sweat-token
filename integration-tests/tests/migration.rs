@@ -10,8 +10,6 @@ use common::helpers::init_tracing;
 const FT_POSTFIX: &str = ".u.sweat.testnet";
 const INITIAL_USER_BALANCE: NearToken = NearToken::from_near(10);
 
-/// The previously deployed (pre-ACL) release, used as the version the
-/// contract migrates from.
 fn old_wasm_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
@@ -19,9 +17,6 @@ fn old_wasm_path() -> PathBuf {
         .join("sweat_old.wasm")
 }
 
-/// The freshly built contract under test. Mirrors `prepare::sweat_wasm_path`
-/// so `make build-integration` output (or a `SWEAT_WASM` override) is picked
-/// up the same way as in the other integration tests.
 fn new_wasm_path() -> PathBuf {
     std::env::var_os("SWEAT_WASM").map(PathBuf::from).unwrap_or_else(|| {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -40,14 +35,6 @@ async fn create_user(root: &Account, name: &str) -> anyhow::Result<Account> {
         .into_result()?)
 }
 
-/// Deploys the old contract, builds up some oracle and token state, then
-/// upgrades to the new contract and runs `migrate`.
-///
-/// Verifies that migration:
-/// - makes the contract account the ACL super admin;
-/// - moves every legacy oracle into the ACL `Oracle` role;
-/// - preserves token balances and the steps counter;
-/// - leaves the contract functional (a migrated oracle can still record).
 #[tokio::test]
 #[tracing::instrument]
 async fn migration_from_pre_acl_release() -> anyhow::Result<()> {
@@ -99,7 +86,10 @@ async fn migration_from_pre_acl_release() -> anyhow::Result<()> {
         .args_json(json!({ "account_id": alice.id() }))
         .await?
         .json()?;
-    assert_ne!(alice_balance_before, "0", "alice should have a balance before migration");
+    assert_ne!(
+        alice_balance_before, "0",
+        "alice should have a balance before migration"
+    );
     info!(steps = %steps_before, balance = %alice_balance_before, "pre-migration snapshot");
 
     info!("deploying new contract over the same account");

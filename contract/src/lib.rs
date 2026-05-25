@@ -41,8 +41,6 @@ pub struct Contract {
     token: FungibleToken,
     steps_since_tge: U64,
     denylist: UnorderedSet<AccountId>,
-    /// The single trusted account that `defer_batch` stages deferred mints
-    /// through. Set by the super admin; never supplied by the Oracle.
     holding_account_id: Option<AccountId>,
 }
 
