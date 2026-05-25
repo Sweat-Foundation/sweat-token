@@ -11,7 +11,6 @@ pub trait SweatApi {
     fn get_holding_account_id(&self) -> Option<AccountId>;
     fn burn(&mut self, amount: U128);
     fn get_steps_since_tge(&self) -> U64;
-    fn record_batch(&mut self, steps_batch: Vec<(AccountId, u32)>);
     fn formula(&self, steps_since_tge: U64, steps: u32) -> U128;
 }
 

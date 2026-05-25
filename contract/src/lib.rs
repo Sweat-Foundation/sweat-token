@@ -3,11 +3,11 @@ extern crate static_assertions;
 
 use api::{Payout, RestrictionApi, SweatApi};
 use near_contract_standards::fungible_token::{
-    events::{FtBurn, FtMint},
+    events::FtBurn,
     metadata::{FungibleTokenMetadata, FungibleTokenMetadataProvider},
     Balance, FungibleToken,
 };
-use near_plugins::{access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable};
+use near_plugins::{access_control, pause, AccessControlRole, AccessControllable, Pausable};
 use near_sdk::{
     borsh::BorshDeserialize,
     collections::UnorderedSet,
@@ -98,39 +98,6 @@ impl SweatApi for Contract {
         self.steps_since_tge
     }
 
-    #[access_control_any(roles(Role::Oracle))]
-    #[pause(name = "minting")]
-    fn record_batch(&mut self, steps_batch: Vec<(AccountId, u32)>) {
-        let mut oracle_fee: U128 = U128(0);
-        let mut sweats: Vec<U128> = Vec::with_capacity(steps_batch.len() + 1);
-        let mut events = Vec::with_capacity(steps_batch.len() + 1);
-
-        for (account_id, steps_count) in &steps_batch {
-            let (minted_to_user, trx_oracle_fee) = self.calculate_tokens_amount(*steps_count);
-            oracle_fee.0 += trx_oracle_fee;
-            internal_deposit(&mut self.token, account_id, minted_to_user);
-
-            sweats.push(U128(minted_to_user));
-            self.steps_since_tge.0 += u64::from(*steps_count);
-        }
-        for i in 0..steps_batch.len() {
-            events.push(FtMint {
-                owner_id: &steps_batch[i].0,
-                amount: sweats[i],
-                memo: None,
-            });
-        }
-
-        internal_deposit(&mut self.token, &env::predecessor_account_id(), oracle_fee.0);
-        let oracle_event = FtMint {
-            owner_id: &env::predecessor_account_id(),
-            amount: oracle_fee,
-            memo: None,
-        };
-        events.push(oracle_event);
-        FtMint::emit_many(events.as_slice());
-    }
-
     #[allow(clippy::cast_precision_loss)]
     fn formula(&self, steps_since_tge: U64, steps: u32) -> U128 {
         U128(math::formula(steps_since_tge.0 as f64, f64::from(steps)))
@@ -205,18 +172,19 @@ impl FungibleTokenMetadataProvider for Contract {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use std::{collections::HashMap, str::FromStr};
 
     use near_contract_standards::fungible_token::core::FungibleTokenCore;
     use near_plugins::AccessControllable;
     use near_sdk::{
         json_types::{U128, U64},
         test_utils::VMContextBuilder,
-        testing_env, AccountId, NearToken,
+        test_vm_config, testing_env, AccountId, NearToken, PromiseResult, RuntimeFeesConfig,
     };
 
     use crate::{
-        api::{RestrictionApi, SweatApi},
+        api::{Payout, RestrictionApi, SweatApi, SweatDefer},
+        defer::FungibleTokenTransferCallback,
         Contract, Role,
     };
 
@@ -231,6 +199,9 @@ mod tests {
     }
     fn sweat_oracle() -> AccountId {
         account_id("sweat_the_oracle")
+    }
+    fn sweat_holding() -> AccountId {
+        account_id("sweat_the_holding")
     }
     fn user1() -> AccountId {
         account_id("sweat_user1")
@@ -264,17 +235,34 @@ mod tests {
     #[test]
     fn oracle_fee_test() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), None);
+        let mut token = Contract::new(Some(".u.sweat".to_string()), Some(sweat_holding()));
         assert_eq!(U64(0), token.get_steps_since_tge());
         assert!(get_oracles(&token).is_empty());
         token.add_oracle(&sweat_oracle());
         assert_eq!(vec![sweat_oracle()], get_oracles(&token));
+
+        let p1 = Payout::from(token.formula(U64(0), 10_000).0);
+        let p2 = Payout::from(token.formula(U64(10_000), 10_000).0);
+        let total_effective = U128(p1.amount_for_user + p2.amount_for_user);
+        let total_fee = U128(p1.fee + p2.fee);
+
         testing_env!(get_context(sweat_the_token(), sweat_oracle()).build());
-        token.record_batch(vec![(user1(), 10_000), (user2(), 10_000)]);
-        assert!((9.499_999_991_723_028 - token.token.ft_balance_of(user1()).0 as f64 / 1e+18).abs() < EPS);
-        assert!((9.499_999_975_169_082 - token.token.ft_balance_of(user2()).0 as f64 / 1e+18).abs() < EPS);
-        assert!((0.999_999_998_257_479_4 - token.token.ft_balance_of(sweat_oracle()).0 as f64 / 1e+18).abs() < EPS);
+        let _ = token.defer_batch(vec![(user1(), 10_000), (user2(), 10_000)]);
         assert_eq!(U64(2 * 10_000), token.get_steps_since_tge());
+
+        testing_env!(
+            get_context(sweat_the_token(), sweat_the_token()).build(),
+            test_vm_config(),
+            RuntimeFeesConfig::test(),
+            HashMap::default(),
+            vec![PromiseResult::Successful(vec![])],
+        );
+        token.on_record(sweat_holding(), total_effective, sweat_oracle(), total_fee, 2 * 10_000);
+
+        assert_eq!(token.token.ft_balance_of(sweat_holding()).0, total_effective.0);
+        assert_eq!(token.token.ft_balance_of(sweat_oracle()).0, total_fee.0);
+        assert!(((9.499_999_991_723_028 + 9.499_999_975_169_082) - total_effective.0 as f64 / 1e+18).abs() < EPS);
+        assert!((0.999_999_998_257_479_4 - total_fee.0 as f64 / 1e+18).abs() < EPS);
     }
 
     #[test]

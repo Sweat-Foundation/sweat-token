@@ -7,7 +7,7 @@
       "compiler": "rustc 1.86.0",
       "builder": "cargo-near cargo-near-build 0.11.0"
     },
-    "wasm_hash": "BstPokT2qYani2Df5Uvhz36MiHjv4mdj2Lk8thCfXZZJ"
+    "wasm_hash": "6epCTG3uUXdoqoKPL29GuZ5RUeSTDkLjR2QGb8SjXjyy"
   },
   "body": {
     "functions": [
@@ -852,6 +852,14 @@
         }
       },
       {
+        "name": "migrate",
+        "kind": "call",
+        "modifiers": [
+          "init",
+          "private"
+        ]
+      },
+      {
         "name": "new",
         "kind": "call",
         "modifiers": [
@@ -915,6 +923,14 @@
               "name": "fee",
               "type_schema": {
                 "type": "string"
+              }
+            },
+            {
+              "name": "steps_increment",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0.0
               }
             }
           ]
@@ -1013,37 +1029,6 @@
           "type_schema": {
             "type": "boolean"
           }
-        }
-      },
-      {
-        "name": "record_batch",
-        "kind": "call",
-        "params": {
-          "serialization_type": "json",
-          "args": [
-            {
-              "name": "steps_batch",
-              "type_schema": {
-                "type": "array",
-                "items": {
-                  "type": "array",
-                  "items": [
-                    {
-                      "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
-                      "type": "string"
-                    },
-                    {
-                      "type": "integer",
-                      "format": "uint32",
-                      "minimum": 0.0
-                    }
-                  ],
-                  "maxItems": 2,
-                  "minItems": 2
-                }
-              }
-            }
-          ]
         }
       },
       {
