@@ -5,7 +5,7 @@ use api::{Payout, RestrictionApi, SweatApi};
 use near_contract_standards::fungible_token::{
     events::FtBurn,
     metadata::{FungibleTokenMetadata, FungibleTokenMetadataProvider},
-    Balance, FungibleToken,
+    FungibleToken,
 };
 use near_plugins::{access_control, pause, AccessControlRole, AccessControllable, Pausable};
 use near_sdk::{
@@ -126,21 +126,6 @@ impl Contract {
     }
 }
 
-/// Taken from contract standards but modified to default if account isn't initialized
-/// rather than panicking:
-/// <https://github.com/near/near-sdk-rs/blob/6596dc311036fe51d94358ac8f6497ef6e5a7cfc/near-contract-standards/src/fungible_token/core_impl.rs#L105>
-fn internal_deposit(token: &mut FungibleToken, account_id: &AccountId, amount: Balance) {
-    let balance = token.accounts.get(account_id).unwrap_or_default();
-    let new_balance = balance
-        .checked_add(amount)
-        .unwrap_or_else(|| env::panic_str("Balance overflow"));
-    token.accounts.insert(account_id, &new_balance);
-    token.total_supply = token
-        .total_supply
-        .checked_add(amount)
-        .unwrap_or_else(|| env::panic_str("Total supply overflow"));
-}
-
 pub const ICON: &str = "data:image/svg+xml,%3Csvg viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100' height='100' rx='50' fill='%23FF0D75'/%3E%3Cg clip-path='url(%23clip0_283_2788)'%3E%3Cpath d='M39.4653 77.5455L19.0089 40.02L35.5411 22.2805L55.9975 59.806L39.4653 77.5455Z' stroke='white' stroke-width='10'/%3E%3Cpath d='M66.0253 77.8531L45.569 40.3276L62.1012 22.5882L82.5576 60.1136L66.0253 77.8531Z' stroke='white' stroke-width='10'/%3E%3C/g%3E%3Cdefs%3E%3CclipPath id='clip0_283_2788'%3E%3Crect width='100' height='56' fill='white' transform='translate(0 22)'/%3E%3C/clipPath%3E%3C/defs%3E%3C/svg%3E%0A";
 
 #[near]
@@ -172,6 +157,7 @@ mod tests {
 
     use crate::{
         api::{Payout, RestrictionApi, SweatApi, SweatDefer},
+        core::InternalDeposit,
         defer::FungibleTokenTransferCallback,
         Contract, Role,
     };
@@ -364,6 +350,6 @@ mod tests {
     }
 
     fn mint(contract: &mut Contract, account_id: &AccountId, amount: u128) {
-        crate::internal_deposit(&mut contract.token, account_id, amount);
+        contract.internal_deposit(account_id, amount);
     }
 }

@@ -8,7 +8,7 @@ use near_sdk::{
     AccountId, Gas, NearToken, Promise, PromiseOrValue,
 };
 
-use crate::{api::SweatDefer, internal_deposit, Contract, ContractExt, Role};
+use crate::{api::SweatDefer, core::InternalDeposit, Contract, ContractExt, Role};
 use near_plugins::{access_control_any, pause, AccessControllable, Pausable};
 
 const GAS_FOR_DEFER_CALLBACK: Gas = Gas::from_tgas(5);
@@ -106,14 +106,14 @@ impl FungibleTokenTransferCallback for Contract {
 
         let mut events: Vec<FtMint> = Vec::with_capacity(2);
 
-        internal_deposit(&mut self.token, &fee_account_id, fee.0);
+        self.internal_deposit(&fee_account_id, fee.0);
         events.push(FtMint {
             owner_id: &fee_account_id,
             amount: fee,
             memo: None,
         });
 
-        internal_deposit(&mut self.token, &receiver_id, amount.0);
+        self.internal_deposit(&receiver_id, amount.0);
         events.push(FtMint {
             owner_id: &receiver_id,
             amount,
