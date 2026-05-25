@@ -114,6 +114,66 @@ async fn test_acl_defer_batch() -> anyhow::Result<()> {
 
 #[tokio::test]
 #[tracing::instrument]
+async fn test_acl_set_restricted() -> anyhow::Result<()> {
+    let context = Context::builder().build().await?;
+
+    info!("call set_restricted(alice, true) [signer=alice, unauthorized]");
+    let result = context
+        .alice
+        .call(context.sweat.id(), "set_restricted")
+        .args_json(json!({
+            "account_id": context.alice.id(),
+            "is_restricted": true,
+        }))
+        .transact()
+        .await?
+        .into_result();
+    assert!(result.has_panic("Insufficient permissions for method set_restricted restricted by access control."));
+    info!("set_restricted: {result:?}");
+
+    info!("call acl_grant_role(DenylistManager, alice) [signer=contract, super-admin]");
+    let granted: Option<bool> = context
+        .sweat
+        .call("acl_grant_role")
+        .args_json(json!({
+            "role": "DenylistManager",
+            "account_id": context.alice.id(),
+        }))
+        .transact()
+        .await?
+        .json()?;
+    assert_eq!(granted, Some(true));
+    info!("acl_grant_role: {granted:?}");
+
+    info!("call set_restricted(alice, true) [signer=alice, authorized]");
+    let result = context
+        .alice
+        .call(context.sweat.id(), "set_restricted")
+        .args_json(json!({
+            "account_id": context.alice.id(),
+            "is_restricted": true,
+        }))
+        .transact()
+        .await?
+        .into_result()?;
+    assert!(result.outcome().is_success());
+    info!("set_restricted: {result:?}");
+
+    info!("view is_restricted(alice)");
+    let is_restricted: bool = context
+        .sweat
+        .view("is_restricted")
+        .args_json(json!({ "account_id": context.alice.id() }))
+        .await?
+        .json()?;
+    assert!(is_restricted);
+    info!("is_restricted: {is_restricted:?}");
+
+    Ok(())
+}
+
+#[tokio::test]
+#[tracing::instrument]
 async fn test_acl_pause_feature() -> anyhow::Result<()> {
     let context = Context::builder().build().await?;
 

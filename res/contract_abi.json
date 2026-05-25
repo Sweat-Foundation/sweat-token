@@ -7,7 +7,7 @@
       "compiler": "rustc 1.86.0",
       "builder": "cargo-near cargo-near-build 0.11.0"
     },
-    "wasm_hash": "Gqb81N1UPFbZDhPJXbMhQroRqMyvcv96RmsTJiM4A1DL"
+    "wasm_hash": "4ktUwgeUSJzwJmGUPoAvSuMa4cbfYuRH8iq5FeTEdohW"
   },
   "body": {
     "functions": [
@@ -1040,9 +1040,6 @@
       {
         "name": "set_restricted",
         "kind": "call",
-        "modifiers": [
-          "private"
-        ],
         "params": {
           "serialization_type": "json",
           "args": [

@@ -3,7 +3,7 @@ extern crate static_assertions;
 
 use api::{Payout, RestrictionApi, SweatApi};
 use near_contract_standards::fungible_token::{events::FtBurn, FungibleToken};
-use near_plugins::{access_control, pause, AccessControlRole, AccessControllable, Pausable};
+use near_plugins::{access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable};
 use near_sdk::{
     borsh::BorshDeserialize,
     collections::UnorderedSet,
@@ -28,6 +28,7 @@ pub enum Role {
     Oracle,
     PauseManager,
     UnpauseManager,
+    DenylistManager,
 }
 
 #[near(contract_state)]
@@ -98,7 +99,7 @@ impl RestrictionApi for Contract {
         self.denylist.contains(account_id)
     }
 
-    #[private]
+    #[access_control_any(roles(Role::DenylistManager))]
     fn set_restricted(&mut self, account_id: &AccountId, is_restricted: bool) {
         if is_restricted {
             self.denylist.insert(account_id);
@@ -277,6 +278,7 @@ mod tests {
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
         mint(&mut token, &user2(), 9499999991723028480);
+        token.acl_grant_role(Role::DenylistManager.into(), sweat_the_token());
         token.set_restricted(&user1(), true);
 
         testing_env!(get_context(sweat_the_token(), user1()).build());
@@ -292,6 +294,7 @@ mod tests {
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
         mint(&mut token, &user2(), 9499999991723028480);
+        token.acl_grant_role(Role::DenylistManager.into(), sweat_the_token());
         token.set_restricted(&user2(), true);
 
         testing_env!(get_context(sweat_the_token(), user1()).build());
@@ -307,6 +310,7 @@ mod tests {
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
         mint(&mut token, &user2(), 9499999991723028480);
+        token.acl_grant_role(Role::DenylistManager.into(), sweat_the_token());
         token.set_restricted(&user1(), true);
 
         testing_env!(get_context(sweat_the_token(), user1()).build());
@@ -322,6 +326,7 @@ mod tests {
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
         mint(&mut token, &user2(), 9499999991723028480);
+        token.acl_grant_role(Role::DenylistManager.into(), sweat_the_token());
         token.set_restricted(&user2(), true);
 
         testing_env!(get_context(sweat_the_token(), user1()).build());

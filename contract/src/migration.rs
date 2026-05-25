@@ -26,6 +26,7 @@ impl Contract {
         };
 
         contract.acl_init_super_admin(env::current_account_id());
+        contract.acl_grant_role(Role::DenylistManager.into(), env::current_account_id());
 
         for oracle in old.oracles.iter() {
             contract.acl_grant_role(Role::Oracle.into(), oracle);

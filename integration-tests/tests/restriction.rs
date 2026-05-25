@@ -5,10 +5,20 @@ use tracing::info;
 mod common;
 use common::{panic::PanicFinder, prepare::Context, storage::register_for_storage};
 
-/// The denylist check fires before any balance arithmetic, so these tests
-/// only need alice flagged as restricted — no minted balance required.
 async fn restrict_alice(context: &Context) -> anyhow::Result<()> {
-    info!("call set_restricted(alice, true) [signer=contract]");
+    info!("call acl_grant_role(DenylistManager, sweat) [signer=contract, super-admin]");
+    context
+        .sweat
+        .call("acl_grant_role")
+        .args_json(json!({
+            "role": "DenylistManager",
+            "account_id": context.sweat.id(),
+        }))
+        .transact()
+        .await?
+        .into_result()?;
+
+    info!("call set_restricted(alice, true) [signer=contract, DenylistManager]");
     context
         .sweat
         .call("set_restricted")
