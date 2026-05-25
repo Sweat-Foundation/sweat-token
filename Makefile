@@ -3,7 +3,7 @@ help: ##@Miscellaneous Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
 install: ##@Miscellaneous Install dependencies
-	@npm i near-cli
+	@cargo install near-cli-rs
 	@cargo build
 
 build: ##@Build the contract locally.
