@@ -5,8 +5,6 @@ use near_sdk::{
 
 pub trait SweatApi {
     fn new(postfix: Option<String>, holding_account_id: Option<AccountId>) -> Self;
-    fn add_oracle(&mut self, account_id: &AccountId);
-    fn remove_oracle(&mut self, account_id: &AccountId);
     fn set_holding_account_id(&mut self, account_id: AccountId);
     fn get_holding_account_id(&self) -> Option<AccountId>;
     fn burn(&mut self, amount: U128);

@@ -18,7 +18,7 @@ use near_sdk::{
     AccountId, PanicOnDefault,
 };
 
-mod api;
+pub mod api;
 mod core;
 mod defer;
 mod integration;
@@ -58,16 +58,6 @@ impl SweatApi for Contract {
         contract.acl_init_super_admin(env::current_account_id());
 
         contract
-    }
-
-    #[private]
-    fn add_oracle(&mut self, account_id: &AccountId) {
-        self.acl_grant_role(Role::Oracle.into(), account_id.clone());
-    }
-
-    #[private]
-    fn remove_oracle(&mut self, account_id: &AccountId) {
-        self.acl_revoke_role(Role::Oracle.into(), account_id.clone());
     }
 
     #[private]
@@ -224,9 +214,9 @@ mod tests {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
         let mut token = Contract::new(Some(".u.sweat".to_string()), None);
         assert!(get_oracles(&token).is_empty());
-        token.add_oracle(&sweat_oracle());
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         assert_eq!(vec![sweat_oracle()], get_oracles(&token));
-        token.remove_oracle(&sweat_oracle());
+        token.acl_revoke_role(Role::Oracle.into(), sweat_oracle());
         assert!(get_oracles(&token).is_empty());
     }
 
@@ -236,7 +226,7 @@ mod tests {
         let mut token = Contract::new(Some(".u.sweat".to_string()), Some(sweat_holding()));
         assert_eq!(U64(0), token.get_steps_since_tge());
         assert!(get_oracles(&token).is_empty());
-        token.add_oracle(&sweat_oracle());
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         assert_eq!(vec![sweat_oracle()], get_oracles(&token));
 
         let p1 = Payout::from(token.formula(U64(0), 10_000).0);
@@ -268,7 +258,7 @@ mod tests {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
         let mut token = Contract::new(Some(".u.sweat".to_string()), None);
         assert!(get_oracles(&token).is_empty());
-        token.add_oracle(&sweat_oracle());
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
         testing_env!(get_context(sweat_the_token(), user1()).build());
         token.burn(U128(9499999991723028480));
@@ -281,7 +271,7 @@ mod tests {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
         let mut token = Contract::new(Some(".u.sweat".to_string()), None);
         assert!(get_oracles(&token).is_empty());
-        token.add_oracle(&sweat_oracle());
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
         testing_env!(get_context(sweat_the_token(), user1()).build());
 
@@ -297,7 +287,7 @@ mod tests {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
         let mut token = Contract::new(Some(".u.sweat".to_string()), None);
         assert!(get_oracles(&token).is_empty());
-        token.add_oracle(&sweat_oracle());
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
         mint(&mut token, &user2(), 9499999991723028480);
         testing_env!(get_context(sweat_the_token(), user1()).build());
@@ -315,7 +305,7 @@ mod tests {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
         let mut token = Contract::new(Some(".u.sweat".to_string()), None);
         assert!(get_oracles(&token).is_empty());
-        token.add_oracle(&sweat_oracle());
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
         mint(&mut token, &user2(), 9499999991723028480);
         token.set_restricted(&user1(), true);
@@ -330,7 +320,7 @@ mod tests {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
         let mut token = Contract::new(Some(".u.sweat".to_string()), None);
         assert!(get_oracles(&token).is_empty());
-        token.add_oracle(&sweat_oracle());
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
         mint(&mut token, &user2(), 9499999991723028480);
         token.set_restricted(&user2(), true);
@@ -345,13 +335,13 @@ mod tests {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
         let mut token = Contract::new(Some(".u.sweat".to_string()), None);
         assert!(get_oracles(&token).is_empty());
-        token.add_oracle(&sweat_oracle());
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
         mint(&mut token, &user2(), 9499999991723028480);
         token.set_restricted(&user1(), true);
 
         testing_env!(get_context(sweat_the_token(), user1()).build());
-        token.ft_transfer_call(user2(), U128(9499999991723028480), None, String::from("test"));
+        let _ = token.ft_transfer_call(user2(), U128(9499999991723028480), None, String::from("test"));
     }
 
     #[test]
@@ -360,13 +350,13 @@ mod tests {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
         let mut token = Contract::new(Some(".u.sweat".to_string()), None);
         assert!(get_oracles(&token).is_empty());
-        token.add_oracle(&sweat_oracle());
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
         mint(&mut token, &user2(), 9499999991723028480);
         token.set_restricted(&user2(), true);
 
         testing_env!(get_context(sweat_the_token(), user1()).build());
-        token.ft_transfer_call(user2(), U128(9499999991723028480), None, String::from("test"));
+        let _ = token.ft_transfer_call(user2(), U128(9499999991723028480), None, String::from("test"));
     }
 
     fn get_oracles(contract: &Contract) -> Vec<AccountId> {

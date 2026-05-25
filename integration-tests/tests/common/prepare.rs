@@ -133,11 +133,14 @@ impl ContextBuilder {
         storage_deposit(&sweat, alice.id(), min).await?;
 
         let oracle = if self.oracle {
-            info!("creating oracle + sweat.add_oracle");
+            info!("creating oracle + sweat.acl_grant_role(Oracle)");
             let oracle = create_user(&root, "oracle").await?;
             sweat
-                .call("add_oracle")
-                .args_json(json!({ "account_id": oracle.id() }))
+                .call("acl_grant_role")
+                .args_json(json!({
+                    "role": "Oracle",
+                    "account_id": oracle.id(),
+                }))
                 .transact()
                 .await?
                 .into_result()?;
