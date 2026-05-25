@@ -97,7 +97,13 @@ async fn migration_from_pre_acl_release() -> anyhow::Result<()> {
     contract.as_account().deploy(&new_wasm).await?.into_result()?;
 
     info!("calling migrate [signer=contract account]");
-    contract.call("migrate").max_gas().transact().await?.into_result()?;
+    contract
+        .call("migrate")
+        .args_json(json!({ "holding_account_id": root.id() }))
+        .max_gas()
+        .transact()
+        .await?
+        .into_result()?;
 
     info!("verifying super admin");
     let is_super_admin: bool = contract

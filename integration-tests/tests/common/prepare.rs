@@ -115,12 +115,18 @@ impl ContextBuilder {
             None
         };
 
+        // Initializing sweat requires a holding account id. When the test
+        // doesn't deploy the claim contract, fall back to the sandbox root
+        // account — tests that don't exercise defer_batch don't care which
+        // account holds the role.
+        let holding_account_id = claim.as_ref().map(Contract::id).unwrap_or_else(|| root.id());
+
         info!("initializing sweat (new)");
         sweat
             .call("new")
             .args_json(json!({
                 "postfix": FT_POSTFIX,
-                "holding_account_id": claim.as_ref().map(Contract::id),
+                "holding_account_id": holding_account_id,
             }))
             .transact()
             .await?

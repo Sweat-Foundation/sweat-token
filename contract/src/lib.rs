@@ -39,16 +39,15 @@ pub struct Contract {
     steps_since_tge: U64,
     denylist: UnorderedSet<AccountId>,
     /// Trusted protocol-owned contract that custodies the user portion of every
-    /// minted batch until end users claim their rewards. Minting via
-    /// [`api::SweatDefer::defer_batch`] requires this to be set. See the
-    /// [`defer`] module docs for the full claim flow and trust model.
-    holding_account_id: Option<AccountId>,
+    /// minted batch until end users claim their rewards. See the [`defer`]
+    /// module docs for the full claim flow and trust model.
+    holding_account_id: AccountId,
 }
 
 #[near]
 impl SweatApi for Contract {
     #[init]
-    fn new(postfix: Option<String>, holding_account_id: Option<AccountId>) -> Self {
+    fn new(postfix: Option<String>, holding_account_id: AccountId) -> Self {
         let mut contract = Self {
             token: FungibleToken::new(b"t", postfix),
             steps_since_tge: U64::from(0),
@@ -63,10 +62,10 @@ impl SweatApi for Contract {
 
     #[private]
     fn set_holding_account_id(&mut self, account_id: AccountId) {
-        self.holding_account_id = Some(account_id);
+        self.holding_account_id = account_id;
     }
 
-    fn get_holding_account_id(&self) -> Option<AccountId> {
+    fn get_holding_account_id(&self) -> AccountId {
         self.holding_account_id.clone()
     }
 
@@ -182,7 +181,7 @@ mod tests {
     #[test]
     fn add_remove_oracle() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), None);
+        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         assert_eq!(vec![sweat_oracle()], get_oracles(&token));
@@ -193,7 +192,7 @@ mod tests {
     #[test]
     fn oracle_fee_test() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), Some(sweat_holding()));
+        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
         assert_eq!(U64(0), token.get_steps_since_tge());
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
@@ -226,7 +225,7 @@ mod tests {
     #[test]
     fn burn() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), None);
+        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
@@ -239,7 +238,7 @@ mod tests {
     #[should_panic(expected = r#"The account sweat_user2 is not registered"#)]
     fn transfer_to_unregistered() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), None);
+        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
@@ -255,7 +254,7 @@ mod tests {
     #[test]
     fn transfer_to_registered() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), None);
+        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
@@ -273,7 +272,7 @@ mod tests {
     #[should_panic(expected = r#"The account sweat_user1 is restricted"#)]
     fn transfer_from_denied_account() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), None);
+        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
@@ -288,7 +287,7 @@ mod tests {
     #[should_panic(expected = r#"The account sweat_user2 is restricted"#)]
     fn transfer_to_denied_account() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), None);
+        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
@@ -303,7 +302,7 @@ mod tests {
     #[should_panic(expected = r#"The account sweat_user1 is restricted"#)]
     fn ft_transfer_call_from_denied_account() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), None);
+        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
@@ -318,7 +317,7 @@ mod tests {
     #[should_panic(expected = r#"The account sweat_user2 is restricted"#)]
     fn ft_transfer_call_to_denied_account() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), None);
+        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);

@@ -90,31 +90,6 @@ async fn test_defer() -> anyhow::Result<()> {
 
 #[tokio::test]
 #[tracing::instrument]
-async fn test_defer_batch_panics_when_holding_account_unset() -> anyhow::Result<()> {
-    let context = Context::builder().with_oracle().build().await?;
-
-    info!("view get_holding_account_id");
-    let holding: Option<String> = context.sweat.view("get_holding_account_id").await?.json()?;
-    assert_eq!(holding, None);
-    info!("holding account is unset");
-
-    info!("call defer_batch([(alice, {CLAIM_AMOUNT})]) [signer=oracle] — holding account unset");
-    let result = context
-        .oracle()
-        .call(context.sweat.id(), "defer_batch")
-        .args_json(json!({ "steps_batch": [[context.alice.id(), CLAIM_AMOUNT]] }))
-        .max_gas()
-        .transact()
-        .await?
-        .into_result();
-    assert!(result.has_panic("Holding account is not set"));
-    info!("defer_batch: {result:?}");
-
-    Ok(())
-}
-
-#[tokio::test]
-#[tracing::instrument]
 async fn test_set_holding_account_id_updates_defer_target() -> anyhow::Result<()> {
     let context = Context::builder()
         .with_oracle()
@@ -124,9 +99,9 @@ async fn test_set_holding_account_id_updates_defer_target() -> anyhow::Result<()
         .await?;
 
     info!("view get_holding_account_id [baked in at init]");
-    let holding: Option<String> = context.sweat.view("get_holding_account_id").await?.json()?;
-    assert_eq!(holding, Some(context.claim().id().to_string()));
-    info!(?holding, "holding account starts as claim");
+    let holding: String = context.sweat.view("get_holding_account_id").await?.json()?;
+    assert_eq!(holding, context.claim().id().to_string());
+    info!(%holding, "holding account starts as claim");
 
     info!("call set_holding_account_id(stub) [signer=contract, super-admin]");
     context
@@ -138,9 +113,9 @@ async fn test_set_holding_account_id_updates_defer_target() -> anyhow::Result<()
         .into_result()?;
 
     info!("view get_holding_account_id [after update]");
-    let holding: Option<String> = context.sweat.view("get_holding_account_id").await?.json()?;
-    assert_eq!(holding, Some(context.stub().id().to_string()));
-    info!(?holding, "holding account updated to stub");
+    let holding: String = context.sweat.view("get_holding_account_id").await?.json()?;
+    assert_eq!(holding, context.stub().id().to_string());
+    info!(%holding, "holding account updated to stub");
 
     info!("view formula(0, {CLAIM_AMOUNT}) — raw deferred amount");
     let minted_raw: String = context
@@ -213,9 +188,9 @@ async fn test_set_holding_account_id_rejects_non_admin() -> anyhow::Result<()> {
     info!("set_holding_account_id: {result:?}");
 
     info!("view get_holding_account_id [unchanged]");
-    let holding: Option<String> = context.sweat.view("get_holding_account_id").await?.json()?;
-    assert_eq!(holding, Some(context.claim().id().to_string()));
-    info!(?holding, "holding account unchanged");
+    let holding: String = context.sweat.view("get_holding_account_id").await?.json()?;
+    assert_eq!(holding, context.claim().id().to_string());
+    info!(%holding, "holding account unchanged");
 
     Ok(())
 }

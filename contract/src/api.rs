@@ -4,12 +4,12 @@ use near_sdk::{
 };
 
 pub trait SweatApi {
-    fn new(postfix: Option<String>, holding_account_id: Option<AccountId>) -> Self;
+    fn new(postfix: Option<String>, holding_account_id: AccountId) -> Self;
     /// Sets the trusted holding-account contract that will custody the user
     /// portion of every minted batch until end users claim it. See the
     /// [`crate::defer`] module docs for the full flow.
     fn set_holding_account_id(&mut self, account_id: AccountId);
-    fn get_holding_account_id(&self) -> Option<AccountId>;
+    fn get_holding_account_id(&self) -> AccountId;
     fn burn(&mut self, amount: U128);
     fn get_steps_since_tge(&self) -> U64;
     fn formula(&self, steps_since_tge: U64, steps: u32) -> U128;

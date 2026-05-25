@@ -15,14 +15,14 @@ struct OldContract {
 impl Contract {
     #[private]
     #[init(ignore_state)]
-    pub fn migrate() -> Self {
+    pub fn migrate(holding_account_id: AccountId) -> Self {
         let mut old: OldContract = env::state_read().expect("failed to read old contract state");
 
         let mut contract = Self {
             token: old.token,
             steps_since_tge: old.steps_since_tge,
             denylist: UnorderedSet::new(b"d"),
-            holding_account_id: None,
+            holding_account_id,
         };
 
         contract.acl_init_super_admin(env::current_account_id());

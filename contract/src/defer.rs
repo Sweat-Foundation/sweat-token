@@ -91,10 +91,7 @@ impl SweatDefer for Contract {
             "Not enough gas to complete the operation"
         );
 
-        let holding_account_id = self
-            .holding_account_id
-            .clone()
-            .unwrap_or_else(|| panic_str("Holding account is not set"));
+        let holding_account_id = self.holding_account_id.clone();
 
         let mut accounts_tokens: Vec<(AccountId, U128)> = Vec::new();
         let mut total_effective: U128 = U128(0);
