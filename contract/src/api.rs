@@ -5,6 +5,9 @@ use near_sdk::{
 
 pub trait SweatApi {
     fn new(postfix: Option<String>, holding_account_id: Option<AccountId>) -> Self;
+    /// Sets the trusted holding-account contract that will custody the user
+    /// portion of every minted batch until end users claim it. See the
+    /// [`crate::defer`] module docs for the full flow.
     fn set_holding_account_id(&mut self, account_id: AccountId);
     fn get_holding_account_id(&self) -> Option<AccountId>;
     fn burn(&mut self, amount: U128);
@@ -17,6 +20,11 @@ pub trait RestrictionApi {
     fn set_restricted(&mut self, account_id: &AccountId, is_restricted: bool);
 }
 
+/// Token-minting API.
+///
+/// Implementations mint user rewards to the configured holding account rather
+/// than directly to end users. See the [`crate::defer`] module docs for the
+/// full claim flow and trust model.
 pub trait SweatDefer {
     fn defer_batch(&mut self, steps_batch: Vec<(AccountId, u32)>) -> PromiseOrValue<()>;
 }

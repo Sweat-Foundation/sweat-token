@@ -38,6 +38,10 @@ pub struct Contract {
     token: FungibleToken,
     steps_since_tge: U64,
     denylist: UnorderedSet<AccountId>,
+    /// Trusted protocol-owned contract that custodies the user portion of every
+    /// minted batch until end users claim their rewards. Minting via
+    /// [`api::SweatDefer::defer_batch`] requires this to be set. See the
+    /// [`defer`] module docs for the full claim flow and trust model.
     holding_account_id: Option<AccountId>,
 }
 

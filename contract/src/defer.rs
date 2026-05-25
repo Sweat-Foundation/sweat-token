@@ -1,3 +1,70 @@
+//! Deferred minting via the holding account.
+//!
+//! Newly minted user rewards are **not** credited to end-user accounts at mint
+//! time. End users must **actively claim** their rewards from a separate
+//! protocol-owned contract — the *holding account* — which is the only party
+//! (besides the Oracle fee) that this contract ever mints user-portion tokens
+//! to.
+//!
+//! # Roles
+//!
+//! - **This contract** owns the supply and controls minting. It never keeps a
+//!   per-user ledger of unclaimed rewards.
+//! - **Holding account** ([`Contract::holding_account_id`]) is a separate,
+//!   protocol-owned smart contract. It is trusted by this contract (which is
+//!   why [`crate::core::InternalDeposit::internal_deposit`] is allowed to skip
+//!   storage registration for it — see the doc-comment there). The holding
+//!   contract maintains the per-user ledger of unclaimed rewards and releases
+//!   tokens on claim.
+//! - **End user** earns steps. After a batch is recorded, the user calls the
+//!   holding contract to claim their accumulated balance; the holding contract
+//!   then performs a standard NEP-141 `ft_transfer` from itself to the user.
+//!
+//! # Batch lifecycle: from steps to a claimable balance
+//!
+//! 1. An [`Role::Oracle`] grantee calls [`SweatDefer::defer_batch`] with a
+//!    `Vec<(AccountId, steps)>`.
+//! 2. This contract computes `(amount, fee)` per `(user, steps)` pair, sums
+//!    them, advances `steps_since_tge`, and packs the per-user breakdown into
+//!    `amounts: Vec<(AccountId, U128)>`.
+//! 3. It calls `record_batch_for_hold({ amounts })` on the holding account.
+//!    This is the hand-off point: the holding account persists the per-user
+//!    accounting (so it knows exactly how much each user is owed) *before* any
+//!    tokens exist.
+//! 4. The [`FungibleTokenTransferCallback::on_record`] callback:
+//!    - **on success** mints `total_effective` (the user portion) to
+//!      [`Contract::holding_account_id`] and `total_fee` to the Oracle that
+//!      submitted the batch, and emits two [`FtMint`] events. The user portion
+//!      now sits in the holding account's NEP-141 balance on this contract,
+//!      earmarked in the holding contract's own storage for the individual
+//!      users recorded in step 3.
+//!    - **on failure** rolls back `steps_since_tge` and mints nothing. The
+//!      holding account is expected to treat its own `record_batch_for_hold`
+//!      call as transactional and not credit users for a batch whose mint did
+//!      not land.
+//! 5. Later, an end user calls a claim method on the **holding contract** (out
+//!    of scope of this crate — it is a separately deployed contract). The
+//!    holding contract decrements that user's internal ledger and issues a
+//!    standard `ft_transfer` from `holding_account_id` to the user.
+//!
+//! # Invariants
+//!
+//! - `ft_balance_of(holding_account_id)` represents the pool of unclaimed user
+//!   rewards plus any residual rounding dust. The holding account custodies
+//!   this balance for users; it does not own it economically.
+//! - There is no path on this contract by which a user receives newly minted
+//!   rewards directly. Every reward path for end users goes through the
+//!   holding contract's claim flow, which uses ordinary NEP-141 transfers and
+//!   is therefore subject to the standard denylist and pause checks in
+//!   [`crate::core`].
+//! - This contract has no visibility into per-user pending balances. "What
+//!   does Alice still have unclaimed?" must be answered by reading the holding
+//!   contract's state, not this one.
+//! - The trust assumption is explicit: a compromised or buggy holding contract
+//!   could mis-credit users or fail to release claims, but it cannot mint
+//!   additional supply — minting authority remains with the Oracle role and is
+//!   gated by [`SweatDefer::defer_batch`].
+
 use near_contract_standards::fungible_token::events::FtMint;
 use near_sdk::{
     env::{self, panic_str},
