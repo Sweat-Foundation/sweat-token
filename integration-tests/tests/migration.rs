@@ -139,15 +139,6 @@ async fn migration_from_pre_acl_release() -> anyhow::Result<()> {
         "get_oracles should be removed from the new contract"
     );
 
-    info!("verifying a migrated oracle can still record via ACL");
-    oracle1
-        .call(contract.id(), "record_batch")
-        .args_json(json!({ "steps_batch": [[alice.id(), 5_000]] }))
-        .max_gas()
-        .transact()
-        .await?
-        .into_result()?;
-
     info!("done");
     Ok(())
 }

@@ -68,50 +68,6 @@ async fn test_acl_grant_role() -> anyhow::Result<()> {
 
 #[tokio::test]
 #[tracing::instrument]
-async fn test_acl_record_batch() -> anyhow::Result<()> {
-    let context = Context::builder().build().await?;
-
-    info!("call record_batch([(alice, 10_000)]) [signer=alice, unauthorized]");
-    let result = context
-        .alice
-        .call(context.sweat.id(), "record_batch")
-        .args_json(json!({ "steps_batch": [[context.alice.id(), 10_000]] }))
-        .transact()
-        .await?
-        .into_result();
-    assert!(result.has_panic("Insufficient permissions for method record_batch restricted by access control."));
-    info!("record_batch: {result:?}");
-
-    info!("call acl_grant_role(Oracle, alice) [signer=contract, super-admin]");
-    let granted: Option<bool> = context
-        .sweat
-        .call("acl_grant_role")
-        .args_json(json!({
-            "role": "Oracle",
-            "account_id": context.alice.id(),
-        }))
-        .transact()
-        .await?
-        .json()?;
-    assert_eq!(granted, Some(true));
-    info!("acl_grant_role: {granted:?}");
-
-    info!("call record_batch([(alice, 10_000)]) [signer=alice, authorized]");
-    let result = context
-        .alice
-        .call(context.sweat.id(), "record_batch")
-        .args_json(json!({ "steps_batch": [[context.alice.id(), 10_000]] }))
-        .transact()
-        .await?
-        .into_result()?;
-    assert!(result.outcome().is_success());
-    info!("record_batch: {result:?}");
-
-    Ok(())
-}
-
-#[tokio::test]
-#[tracing::instrument]
 async fn test_acl_defer_batch() -> anyhow::Result<()> {
     let context = Context::builder().with_claim().build().await?;
 
