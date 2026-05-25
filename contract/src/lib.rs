@@ -21,6 +21,7 @@ mod integration;
 mod math;
 mod meta;
 mod migration;
+mod storage;
 
 #[derive(AccessControlRole, Deserialize, Serialize, Clone, Copy)]
 #[serde(crate = "near_sdk::serde")]
