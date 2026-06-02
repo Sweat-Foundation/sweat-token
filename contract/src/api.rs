@@ -36,7 +36,7 @@ pub struct Payout {
 
 impl From<u128> for Payout {
     fn from(value: u128) -> Self {
-        let fee = (value * 5).div_ceil(100);
+        let fee = value.div_ceil(20); // == value * 5 / 100
 
         Self {
             fee,
