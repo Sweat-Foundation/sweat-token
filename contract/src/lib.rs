@@ -225,6 +225,42 @@ mod tests {
     }
 
     #[test]
+    fn defer_batch_skips_denylisted_user() {
+        testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
+        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
+
+        token.acl_grant_role(Role::DenylistManager.into(), sweat_the_token());
+        token.set_restricted(&user1(), true);
+
+        testing_env!(get_context(sweat_the_token(), sweat_oracle()).build());
+        let _ = token.defer_batch(vec![(user1(), 10_000), (user2(), 10_000)]);
+
+        // Only the non-denylisted user's steps are counted; user1 is skipped
+        // before its step_count is added. steps_since_tge is the only on-chain
+        // state defer_batch mutates here — the per-user amounts go out in the
+        // record_batch_for_hold XCC args, which a unit test can't observe.
+        assert_eq!(U64(10_000), token.get_steps_since_tge());
+    }
+
+    #[test]
+    fn defer_batch_skips_all_denylisted_users() {
+        testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
+        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
+
+        token.acl_grant_role(Role::DenylistManager.into(), sweat_the_token());
+        token.set_restricted(&user1(), true);
+        token.set_restricted(&user2(), true);
+
+        testing_env!(get_context(sweat_the_token(), sweat_oracle()).build());
+        let _ = token.defer_batch(vec![(user1(), 10_000), (user2(), 10_000)]);
+
+        // Every entry skipped -> no steps recorded.
+        assert_eq!(U64(0), token.get_steps_since_tge());
+    }
+
+    #[test]
     fn burn() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
         let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());

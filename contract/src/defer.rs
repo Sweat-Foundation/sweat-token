@@ -75,7 +75,11 @@ use near_sdk::{
     AccountId, Gas, NearToken, Promise, PromiseOrValue,
 };
 
-use crate::{api::SweatDefer, core::InternalDeposit, Contract, ContractExt, Role};
+use crate::{
+    api::{RestrictionApi, SweatDefer},
+    core::InternalDeposit,
+    Contract, ContractExt, Role,
+};
 use near_plugins::{access_control_any, pause, AccessControllable, Pausable};
 
 const GAS_FOR_DEFER_CALLBACK: Gas = Gas::from_tgas(5);
@@ -99,6 +103,10 @@ impl SweatDefer for Contract {
         let mut steps_increment: u64 = 0;
 
         for (account_id, step_count) in steps_batch {
+            if self.is_restricted(&account_id) {
+                continue;
+            }
+
             let (amount, fee) = self.calculate_tokens_amount(step_count);
             self.steps_since_tge.0 += u64::from(step_count);
             steps_increment += u64::from(step_count);

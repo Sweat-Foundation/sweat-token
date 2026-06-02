@@ -90,6 +90,90 @@ async fn test_defer() -> anyhow::Result<()> {
 
 #[tokio::test]
 #[tracing::instrument]
+async fn test_defer_batch_skips_denylisted_users() -> anyhow::Result<()> {
+    // alice is denylisted, bob is not. A single defer_batch records both. The
+    // loop in defer_batch must skip alice (nothing recorded for her to claim)
+    // while still recording bob. bob is the positive control proving the batch
+    // isn't simply rejected wholesale.
+    let context = Context::builder()
+        .with_oracle()
+        .with_claim()
+        .with_bob()
+        .build()
+        .await?;
+
+    info!("call acl_grant_role(DenylistManager, sweat) [signer=contract, super-admin]");
+    context
+        .sweat
+        .call("acl_grant_role")
+        .args_json(json!({
+            "role": "DenylistManager",
+            "account_id": context.sweat.id(),
+        }))
+        .transact()
+        .await?
+        .into_result()?;
+
+    info!("call set_restricted(alice, true) [signer=contract, DenylistManager]");
+    context
+        .sweat
+        .call("set_restricted")
+        .args_json(json!({
+            "account_id": context.alice.id(),
+            "is_restricted": true,
+        }))
+        .transact()
+        .await?
+        .into_result()?;
+
+    info!("call defer_batch([(alice, {CLAIM_AMOUNT}), (bob, {CLAIM_AMOUNT})]) [signer=oracle]");
+    context
+        .oracle()
+        .call(context.sweat.id(), "defer_batch")
+        .args_json(json!({
+            "steps_batch": [
+                [context.alice.id(), CLAIM_AMOUNT],
+                [context.bob().id(), CLAIM_AMOUNT],
+            ],
+        }))
+        .max_gas()
+        .transact()
+        .await?
+        .into_result()?;
+
+    info!("view get_claimable_balance_for_account(alice) [denylisted — expect nothing]");
+    let alice_claimable: String = context
+        .claim()
+        .view("get_claimable_balance_for_account")
+        .args_json(json!({ "account_id": context.alice.id() }))
+        .await?
+        .json()?;
+    info!(value = %alice_claimable, "alice claimable");
+    assert_eq!(
+        alice_claimable.parse::<u128>()?,
+        0,
+        "denylisted user must have nothing recorded to claim"
+    );
+
+    info!("view get_claimable_balance_for_account(bob) [not denylisted — expect a balance]");
+    let bob_claimable: String = context
+        .claim()
+        .view("get_claimable_balance_for_account")
+        .args_json(json!({ "account_id": context.bob().id() }))
+        .await?
+        .json()?;
+    info!(value = %bob_claimable, "bob claimable");
+    assert!(
+        bob_claimable.parse::<u128>()? > 0,
+        "non-denylisted user must have a claimable balance recorded"
+    );
+
+    info!("done");
+    Ok(())
+}
+
+#[tokio::test]
+#[tracing::instrument]
 async fn test_set_holding_account_id_updates_defer_target() -> anyhow::Result<()> {
     let context = Context::builder()
         .with_oracle()
