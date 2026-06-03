@@ -2,6 +2,7 @@
 extern crate static_assertions;
 
 use api::{Payout, RestrictionApi, SweatApi};
+use event::Event;
 use near_contract_standards::fungible_token::{events::FtBurn, FungibleToken};
 use near_plugins::{access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable};
 use near_sdk::{
@@ -18,6 +19,7 @@ use near_sdk::{
 pub mod api;
 mod core;
 mod defer;
+mod event;
 mod integration;
 mod math;
 mod meta;
@@ -124,6 +126,12 @@ impl RestrictionApi for Contract {
         } else {
             self.denylist.remove(account_id);
         }
+
+        Event::RestrictionChanged {
+            account_id,
+            is_restricted,
+        }
+        .emit();
     }
 }
 
