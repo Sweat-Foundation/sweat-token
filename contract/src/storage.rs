@@ -1,4 +1,5 @@
 use near_contract_standards::storage_management::{StorageBalance, StorageBalanceBounds, StorageManagement};
+use near_plugins::{pause, Pausable};
 use near_sdk::{env, near, AccountId, NearToken};
 
 use crate::{Contract, ContractExt};
@@ -16,6 +17,7 @@ impl StorageManagement for Contract {
     }
 
     #[payable]
+    #[pause(name = "token")]
     fn storage_unregister(&mut self, force: Option<bool>) -> bool {
         self.assert_not_in_denylist(vec![&env::predecessor_account_id()]);
 
