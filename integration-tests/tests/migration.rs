@@ -58,6 +58,10 @@ async fn migration_from_pre_acl_release() -> anyhow::Result<()> {
     let oracle1 = create_user(&root, "oracle1").await?;
     let oracle2 = create_user(&root, "oracle2").await?;
     let alice = create_user(&root, "alice").await?;
+    let admin = create_user(&root, "admin").await?;
+    let denylist_manager = create_user(&root, "denylist-manager").await?;
+    let pause_manager = create_user(&root, "pause-manager").await?;
+    let unpause_manager = create_user(&root, "unpause-manager").await?;
 
     info!("registering oracles on the old contract");
     for oracle in [&oracle1, &oracle2] {
@@ -99,7 +103,13 @@ async fn migration_from_pre_acl_release() -> anyhow::Result<()> {
     info!("calling migrate [signer=contract account]");
     contract
         .call("migrate")
-        .args_json(json!({ "holding_account_id": root.id() }))
+        .args_json(json!({
+            "holding_account_id": root.id(),
+            "super_admin_account_id": admin.id(),
+            "denylist_manager_account_ids": [denylist_manager.id()],
+            "pause_manager_account_ids": [pause_manager.id()],
+            "unpause_manager_account_ids": [unpause_manager.id()],
+        }))
         .max_gas()
         .transact()
         .await?
@@ -108,10 +118,24 @@ async fn migration_from_pre_acl_release() -> anyhow::Result<()> {
     info!("verifying super admin");
     let is_super_admin: bool = contract
         .view("acl_is_super_admin")
-        .args_json(json!({ "account_id": contract.id() }))
+        .args_json(json!({ "account_id": admin.id() }))
         .await?
         .json()?;
-    assert!(is_super_admin, "contract account should be the ACL super admin");
+    assert!(is_super_admin, "admin account should be the ACL super admin");
+
+    info!("verifying role managers migrated to their ACL roles");
+    for (role, manager) in [
+        ("DenylistManager", &denylist_manager),
+        ("PauseManager", &pause_manager),
+        ("UnpauseManager", &unpause_manager),
+    ] {
+        let has_role: bool = contract
+            .view("acl_has_role")
+            .args_json(json!({ "role": role, "account_id": manager.id() }))
+            .await?
+            .json()?;
+        assert!(has_role, "{} should hold the {} role", manager.id(), role);
+    }
 
     info!("verifying oracles migrated to the ACL Oracle role");
     let grantees: Vec<String> = contract

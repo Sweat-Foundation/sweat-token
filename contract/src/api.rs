@@ -4,7 +4,15 @@ use near_sdk::{
 };
 
 pub trait SweatApi {
-    fn new(postfix: Option<String>, holding_account_id: AccountId) -> Self;
+    fn new(
+        postfix: Option<String>,
+        holding_account_id: AccountId,
+        super_admin_account_id: AccountId,
+        oracle_account_ids: Vec<AccountId>,
+        denylist_manager_account_ids: Vec<AccountId>,
+        pause_manager_account_ids: Vec<AccountId>,
+        unpause_manager_account_ids: Vec<AccountId>,
+    ) -> Self;
     /// Sets the trusted holding-account contract that will custody the user
     /// portion of every minted batch until end users claim it. See the
     /// [`crate::defer`] module docs for the full flow.

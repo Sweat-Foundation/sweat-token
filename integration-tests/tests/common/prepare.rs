@@ -127,6 +127,11 @@ impl ContextBuilder {
             .args_json(json!({
                 "postfix": FT_POSTFIX,
                 "holding_account_id": holding_account_id,
+                "super_admin_account_id": sweat.id(),
+                "oracle_account_ids": [],
+                "denylist_manager_account_ids": [],
+                "pause_manager_account_ids": [],
+                "unpause_manager_account_ids": [],
             }))
             .transact()
             .await?

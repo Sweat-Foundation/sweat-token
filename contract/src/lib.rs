@@ -49,7 +49,15 @@ pub struct Contract {
 #[near]
 impl SweatApi for Contract {
     #[init]
-    fn new(postfix: Option<String>, holding_account_id: AccountId) -> Self {
+    fn new(
+        postfix: Option<String>,
+        holding_account_id: AccountId,
+        super_admin_account_id: AccountId,
+        oracle_account_ids: Vec<AccountId>,
+        denylist_manager_account_ids: Vec<AccountId>,
+        pause_manager_account_ids: Vec<AccountId>,
+        unpause_manager_account_ids: Vec<AccountId>,
+    ) -> Self {
         let mut contract = Self {
             token: FungibleToken::new(b"t", postfix),
             steps_since_tge: U64::from(0),
@@ -57,7 +65,13 @@ impl SweatApi for Contract {
             holding_account_id,
         };
 
-        contract.acl_init_super_admin(env::current_account_id());
+        contract.init_acl(
+            super_admin_account_id,
+            oracle_account_ids,
+            denylist_manager_account_ids,
+            pause_manager_account_ids,
+            unpause_manager_account_ids,
+        );
 
         contract
     }
@@ -111,6 +125,36 @@ impl RestrictionApi for Contract {
 }
 
 impl Contract {
+    /// Initializes the ACL: sets the super admin and grants the manager roles.
+    ///
+    /// Uses the unchecked grant path because the super admin is an arbitrary
+    /// account rather than the caller, so the permission-checked
+    /// `acl_grant_role` would silently reject these grants. This must only be
+    /// called from `#[init]` or `#[private]` methods.
+    fn init_acl(
+        &mut self,
+        super_admin_account_id: AccountId,
+        oracle_account_ids: Vec<AccountId>,
+        denylist_manager_account_ids: Vec<AccountId>,
+        pause_manager_account_ids: Vec<AccountId>,
+        unpause_manager_account_ids: Vec<AccountId>,
+    ) {
+        self.acl_init_super_admin(super_admin_account_id);
+
+        let grants = [
+            (Role::Oracle, oracle_account_ids),
+            (Role::DenylistManager, denylist_manager_account_ids),
+            (Role::PauseManager, pause_manager_account_ids),
+            (Role::UnpauseManager, unpause_manager_account_ids),
+        ];
+
+        for (role, account_ids) in grants {
+            for account_id in account_ids {
+                self.acl_get_or_init().grant_role_unchecked(role, &account_id);
+            }
+        }
+    }
+
     pub(crate) fn calculate_tokens_amount(&self, steps: u32) -> (u128, u128) {
         let sweat_to_mint: u128 = self.formula(self.steps_since_tge, steps).0;
         let payout = Payout::from(sweat_to_mint);
@@ -183,7 +227,15 @@ mod tests {
     #[test]
     fn add_remove_oracle() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        let mut token = Contract::new(
+            Some(".u.sweat".to_string()),
+            sweat_holding(),
+            sweat_the_token(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         assert_eq!(vec![sweat_oracle()], get_oracles(&token));
@@ -194,7 +246,15 @@ mod tests {
     #[test]
     fn oracle_fee_test() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        let mut token = Contract::new(
+            Some(".u.sweat".to_string()),
+            sweat_holding(),
+            sweat_the_token(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
         assert_eq!(U64(0), token.get_steps_since_tge());
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
@@ -227,7 +287,15 @@ mod tests {
     #[test]
     fn defer_batch_skips_denylisted_user() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        let mut token = Contract::new(
+            Some(".u.sweat".to_string()),
+            sweat_holding(),
+            sweat_the_token(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
 
         token.acl_grant_role(Role::DenylistManager.into(), sweat_the_token());
@@ -246,7 +314,15 @@ mod tests {
     #[test]
     fn defer_batch_skips_all_denylisted_users() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        let mut token = Contract::new(
+            Some(".u.sweat".to_string()),
+            sweat_holding(),
+            sweat_the_token(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
 
         token.acl_grant_role(Role::DenylistManager.into(), sweat_the_token());
@@ -263,7 +339,15 @@ mod tests {
     #[test]
     fn burn() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        let mut token = Contract::new(
+            Some(".u.sweat".to_string()),
+            sweat_holding(),
+            sweat_the_token(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
@@ -276,7 +360,15 @@ mod tests {
     #[should_panic(expected = r#"The account sweat_user2 is not registered"#)]
     fn transfer_to_unregistered() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        let mut token = Contract::new(
+            Some(".u.sweat".to_string()),
+            sweat_holding(),
+            sweat_the_token(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
@@ -292,7 +384,15 @@ mod tests {
     #[test]
     fn transfer_to_registered() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        let mut token = Contract::new(
+            Some(".u.sweat".to_string()),
+            sweat_holding(),
+            sweat_the_token(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
@@ -310,7 +410,15 @@ mod tests {
     #[should_panic(expected = r#"The account sweat_user1 is restricted"#)]
     fn transfer_from_denied_account() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        let mut token = Contract::new(
+            Some(".u.sweat".to_string()),
+            sweat_holding(),
+            sweat_the_token(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
@@ -326,7 +434,15 @@ mod tests {
     #[should_panic(expected = r#"The account sweat_user2 is restricted"#)]
     fn transfer_to_denied_account() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        let mut token = Contract::new(
+            Some(".u.sweat".to_string()),
+            sweat_holding(),
+            sweat_the_token(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
@@ -342,7 +458,15 @@ mod tests {
     #[should_panic(expected = r#"The account sweat_user1 is restricted"#)]
     fn ft_transfer_call_from_denied_account() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        let mut token = Contract::new(
+            Some(".u.sweat".to_string()),
+            sweat_holding(),
+            sweat_the_token(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
@@ -358,7 +482,15 @@ mod tests {
     #[should_panic(expected = r#"The account sweat_user2 is restricted"#)]
     fn ft_transfer_call_to_denied_account() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
-        let mut token = Contract::new(Some(".u.sweat".to_string()), sweat_holding());
+        let mut token = Contract::new(
+            Some(".u.sweat".to_string()),
+            sweat_holding(),
+            sweat_the_token(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
         assert!(get_oracles(&token).is_empty());
         token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
         mint(&mut token, &user1(), 9499999991723028480);
