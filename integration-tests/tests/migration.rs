@@ -37,7 +37,7 @@ async fn create_user(root: &Account, name: &str) -> anyhow::Result<Account> {
 
 #[tokio::test]
 #[tracing::instrument]
-async fn migration_from_pre_acl_release() -> anyhow::Result<()> {
+async fn migration_from_deployed_release() -> anyhow::Result<()> {
     init_tracing();
 
     info!("booting sandbox");
@@ -58,6 +58,7 @@ async fn migration_from_pre_acl_release() -> anyhow::Result<()> {
     let oracle1 = create_user(&root, "oracle1").await?;
     let oracle2 = create_user(&root, "oracle2").await?;
     let alice = create_user(&root, "alice").await?;
+    let denied = create_user(&root, "denied").await?;
     let admin = create_user(&root, "admin").await?;
     let denylist_manager = create_user(&root, "denylist-manager").await?;
     let pause_manager = create_user(&root, "pause-manager").await?;
@@ -73,6 +74,14 @@ async fn migration_from_pre_acl_release() -> anyhow::Result<()> {
             .into_result()?;
     }
 
+    info!("denylisting an account on the old contract");
+    contract
+        .call("set_restricted")
+        .args_json(json!({ "account_id": denied.id(), "is_restricted": true }))
+        .transact()
+        .await?
+        .into_result()?;
+
     info!("recording a batch on the old contract");
     oracle1
         .call(contract.id(), "record_batch")
@@ -84,6 +93,12 @@ async fn migration_from_pre_acl_release() -> anyhow::Result<()> {
 
     let oracles_before: Vec<String> = contract.view("get_oracles").await?.json()?;
     assert_eq!(oracles_before.len(), 2, "old contract should have 2 oracles");
+    let denied_restricted_before: bool = contract
+        .view("is_restricted")
+        .args_json(json!({ "account_id": denied.id() }))
+        .await?
+        .json()?;
+    assert!(denied_restricted_before, "denied account should be restricted before migration");
     let steps_before: String = contract.view("get_steps_since_tge").await?.json()?;
     let alice_balance_before: String = contract
         .view("ft_balance_of")
@@ -152,6 +167,17 @@ async fn migration_from_pre_acl_release() -> anyhow::Result<()> {
             .json()?;
         assert!(has_role, "{} should hold the Oracle role", oracle.id());
     }
+
+    info!("verifying the denylist survived the migration");
+    let denied_restricted_after: bool = contract
+        .view("is_restricted")
+        .args_json(json!({ "account_id": denied.id() }))
+        .await?
+        .json()?;
+    assert!(
+        denied_restricted_after,
+        "denylisted account must stay restricted after migration"
+    );
 
     info!("verifying token state survived");
     let steps_after: String = contract.view("get_steps_since_tge").await?.json()?;
