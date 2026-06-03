@@ -1,4 +1,7 @@
-use near_contract_standards::storage_management::{StorageBalance, StorageBalanceBounds, StorageManagement};
+use near_contract_standards::{
+    fungible_token::events::FtBurn,
+    storage_management::{StorageBalance, StorageBalanceBounds, StorageManagement},
+};
 use near_plugins::{pause, Pausable};
 use near_sdk::{env, near, AccountId, NearToken};
 
@@ -21,7 +24,17 @@ impl StorageManagement for Contract {
     fn storage_unregister(&mut self, force: Option<bool>) -> bool {
         self.assert_not_in_denylist(vec![&env::predecessor_account_id()]);
 
-        self.token.internal_storage_unregister(force).is_some()
+        self.token
+            .internal_storage_unregister(force)
+            .inspect(|(account_id, balance)| {
+                FtBurn {
+                    owner_id: &account_id,
+                    amount: (*balance).into(),
+                    memo: None,
+                }
+                .emit();
+            })
+            .is_some()
     }
 
     fn storage_balance_bounds(&self) -> StorageBalanceBounds {
