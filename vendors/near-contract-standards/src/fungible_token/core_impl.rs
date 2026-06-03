@@ -27,7 +27,7 @@ pub type Balance = u128;
 /// For example usage, see examples/fungible-token/src/lib.rs.
 #[near]
 pub struct FungibleToken {
-    /// sha256(AccountId) | AccountId -> Account balance
+    /// sha256(AccountId) -> Account balance
     pub accounts: LookupMapAdapter,
 
     /// Total supply of the all token.
@@ -37,30 +37,54 @@ pub struct FungibleToken {
     pub account_storage_usage: StorageUsage,
 }
 
+/// Storage key wrapper for an account balance.
+///
+/// Kept as an enum so the stored key retains its leading borsh discriminant
+/// byte (`Hash` => `0x00`). Existing balances are keyed by `0x00 ‖ sha256` on
+/// the trie; collapsing this into a bare `[u8; 32]` would drop that byte and
+/// orphan every entry, which can't be re-keyed cheaply (the map isn't
+/// enumerable). The historical `AccountId` variant has been removed — no
+/// account was ever stored unhashed — and removing it leaves `Hash` at
+/// discriminant `0`, so the encoding is unchanged.
 #[near]
 pub enum LookupMapKey {
     Hash([u8; 32]),
-    AccountId(String),
 }
 
 #[near]
 pub struct LookupMapAdapter {
     inner: LookupMap<LookupMapKey, Balance>,
-    skip_hashing_postfix: Option<String>,
 }
 
 impl FungibleToken {
-    pub fn new<S>(prefix: S, skip_hashing_postfix: Option<String>) -> Self
+    pub fn new<S>(prefix: S) -> Self
     where
         S: IntoStorageKey,
     {
         let mut this = Self {
-            accounts: LookupMapAdapter::new(prefix, skip_hashing_postfix),
+            accounts: LookupMapAdapter::new(prefix),
             total_supply: 0,
             account_storage_usage: 0,
         };
         this.measure_account_storage_usage();
         this
+    }
+
+    /// Reconstructs the token over already-populated `accounts` storage during a
+    /// state migration. Unlike [`FungibleToken::new`], it adopts `prefix`
+    /// without re-measuring per-account storage — measurement transiently writes
+    /// a probe key and would clobber a live account on a populated map — so the
+    /// recorded `total_supply` and `account_storage_usage` are carried over from
+    /// the previous state instead.
+    pub fn from_prefix<S>(
+        prefix: S,
+        total_supply: Balance,
+        account_storage_usage: StorageUsage,
+    ) -> Self
+    where
+        S: IntoStorageKey,
+    {
+        Self { accounts: LookupMapAdapter::new(prefix), total_supply, account_storage_usage }
     }
 
     fn measure_account_storage_usage(&mut self) {
@@ -260,36 +284,28 @@ impl FungibleTokenResolver for FungibleToken {
 }
 
 impl LookupMapAdapter {
-    fn new<S: IntoStorageKey>(prefix: S, skip_hashing_postfix: Option<String>) -> LookupMapAdapter {
-        Self { inner: LookupMap::new(prefix), skip_hashing_postfix }
+    fn new<S: IntoStorageKey>(prefix: S) -> LookupMapAdapter {
+        Self { inner: LookupMap::new(prefix) }
     }
 
-    fn hash_key(&self, account: &AccountId) -> LookupMapKey {
-        if let Some(postfix) = &self.skip_hashing_postfix {
-            if account.as_str().ends_with(postfix) {
-                LookupMapKey::AccountId(account.to_string())
-            } else {
-                LookupMapKey::Hash(env::sha256_array(account.as_bytes()))
-            }
-        } else {
-            LookupMapKey::Hash(env::sha256_array(account.as_bytes()))
-        }
+    fn hash_key(account: &AccountId) -> LookupMapKey {
+        LookupMapKey::Hash(env::sha256_array(account.as_bytes()))
     }
 
     pub fn get(&self, key: &AccountId) -> Option<Balance> {
-        self.inner.get(&Self::hash_key(self, key))
+        self.inner.get(&Self::hash_key(key))
     }
 
     pub fn remove(&mut self, key: &AccountId) -> Option<Balance> {
-        self.inner.remove(&Self::hash_key(self, key))
+        self.inner.remove(&Self::hash_key(key))
     }
 
     pub fn insert(&mut self, key: &AccountId, value: &Balance) -> Option<Balance> {
-        self.inner.insert(&Self::hash_key(self, key), value)
+        self.inner.insert(&Self::hash_key(key), value)
     }
 
     /// Returns true if the map contains a given key.
     pub fn contains_key(&self, key: &AccountId) -> bool {
-        self.inner.contains_key(&Self::hash_key(self, key))
+        self.inner.contains_key(&Self::hash_key(key))
     }
 }

@@ -1,5 +1,10 @@
-use near_contract_standards::fungible_token::FungibleToken;
-use near_sdk::{collections::UnorderedSet, env, json_types::U64, near, AccountId};
+use near_contract_standards::fungible_token::{Balance, FungibleToken};
+use near_sdk::{
+    collections::{LookupMap, UnorderedSet},
+    env,
+    json_types::U64,
+    near, AccountId, StorageUsage,
+};
 
 use crate::{Contract, ContractExt};
 
@@ -12,9 +17,34 @@ use crate::{Contract, ContractExt};
 #[near(serializers = [borsh])]
 struct OldContract {
     oracles: UnorderedSet<AccountId>,
-    token: FungibleToken,
+    token: OldFungibleToken,
     steps_since_tge: U64,
     denylist: UnorderedSet<AccountId>,
+}
+
+/// Legacy `FungibleToken` layout from the deployed contract.
+///
+/// The current token's `accounts` adapter dropped a `skip_hashing_postfix:
+/// Option<String>` field, which still sits in the deployed state blob between
+/// the map prefix and `total_supply`. The new struct would mis-deserialize
+/// those bytes, so the old state is read through this mirror first. Only the
+/// scalar tallies are reused; the account entries stay in place on the trie
+/// (their keys are unchanged) and remain addressable by the rebuilt token.
+#[near(serializers = [borsh])]
+#[allow(dead_code)]
+struct OldFungibleToken {
+    accounts: OldLookupMapAdapter,
+    total_supply: Balance,
+    account_storage_usage: StorageUsage,
+}
+
+#[near(serializers = [borsh])]
+#[allow(dead_code)] // fields exist only to consume the legacy borsh layout
+struct OldLookupMapAdapter {
+    // `LookupMap` persists nothing but its key prefix, so the key type here is
+    // irrelevant for deserialization — it only needs to satisfy borsh bounds.
+    inner: LookupMap<[u8; 32], Balance>,
+    skip_hashing_postfix: Option<String>,
 }
 
 #[near]
@@ -36,11 +66,8 @@ impl Contract {
         old.oracles.clear();
 
         let mut contract = Self {
-            token: old.token,
+            token: FungibleToken::from_prefix(b"t", old.token.total_supply, old.token.account_storage_usage),
             steps_since_tge: old.steps_since_tge,
-            // Carry the existing denylist over untouched. It already uses the
-            // `b"d"` prefix, matching the new contract, so the stored entries
-            // remain addressable without rewriting storage.
             denylist: old.denylist,
             holding_account_id,
         };

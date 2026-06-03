@@ -5,7 +5,6 @@ use near_sdk::{
 
 pub trait SweatApi {
     fn new(
-        postfix: Option<String>,
         holding_account_id: AccountId,
         super_admin_account_id: AccountId,
         oracle_account_ids: Vec<AccountId>,

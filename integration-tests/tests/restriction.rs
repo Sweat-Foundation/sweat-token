@@ -112,6 +112,7 @@ async fn test_restricted_cannot_burn() -> anyhow::Result<()> {
         .alice
         .call(context.sweat.id(), "burn")
         .args_json(json!({ "amount": "1000000000000000000" }))
+        .deposit(NearToken::from_yoctonear(1))
         .transact()
         .await?
         .into_result();

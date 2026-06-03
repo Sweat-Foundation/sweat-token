@@ -8,7 +8,6 @@ use tracing::info;
 use super::helpers::init_tracing;
 use super::storage::{storage_balance_min, storage_deposit};
 
-const FT_POSTFIX: &str = ".u.sweat.testnet";
 const INITIAL_USER_BALANCE: NearToken = NearToken::from_near(10);
 
 const SWEAT_WASM_ENV: &str = "SWEAT_WASM";
@@ -125,7 +124,6 @@ impl ContextBuilder {
         sweat
             .call("new")
             .args_json(json!({
-                "postfix": FT_POSTFIX,
                 "holding_account_id": holding_account_id,
                 "super_admin_account_id": sweat.id(),
                 "oracle_account_ids": [],
