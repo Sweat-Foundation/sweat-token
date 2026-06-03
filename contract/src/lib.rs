@@ -5,6 +5,7 @@ use api::{Payout, RestrictionApi, SweatApi};
 use near_contract_standards::fungible_token::{events::FtBurn, FungibleToken};
 use near_plugins::{access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable};
 use near_sdk::{
+    assert_one_yocto,
     borsh::BorshDeserialize,
     collections::UnorderedSet,
     env,
@@ -86,7 +87,9 @@ impl SweatApi for Contract {
     }
 
     #[pause(name = "token")]
+    #[payable]
     fn burn(&mut self, amount: U128) {
+        assert_one_yocto();
         self.assert_not_in_denylist(vec![&env::predecessor_account_id()]);
 
         self.token.internal_withdraw(&env::predecessor_account_id(), amount.0);
@@ -354,6 +357,27 @@ mod tests {
         testing_env!(get_context(sweat_the_token(), user1()).build());
         token.burn(U128(9499999991723028480));
         assert!((0.0 - token.token.ft_balance_of(user1()).0 as f64 / 1e+18).abs() < EPS);
+    }
+
+    #[test]
+    #[should_panic(expected = r#"Requires attached deposit of exactly 1 yoctoNEAR"#)]
+    fn burn_without_deposit() {
+        testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
+        let mut token = Contract::new(
+            Some(".u.sweat".to_string()),
+            sweat_holding(),
+            sweat_the_token(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
+        mint(&mut token, &user1(), 9499999991723028480);
+        testing_env!(get_context(sweat_the_token(), user1())
+            .attached_deposit(NearToken::from_yoctonear(0))
+            .build());
+        token.burn(U128(9499999991723028480));
     }
 
     #[test]
