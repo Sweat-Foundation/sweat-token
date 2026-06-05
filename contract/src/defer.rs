@@ -85,11 +85,23 @@ use near_plugins::{access_control_any, AccessControllable};
 const GAS_FOR_DEFER_CALLBACK: Gas = Gas::from_tgas(5);
 const GAS_FOR_DEFER: Gas = Gas::from_tgas(30);
 
+/// Maximum number of `(account, steps)` pairs accepted in a single
+/// [`SweatDefer::defer_batch`] call. The cap keeps a batch within the
+/// transaction gas limit and the receipt/log size limit: larger batches risk
+/// exhausting the gas reserved for the cross-contract `record_batch_for_hold`
+/// call and callback, and overflowing the maximum log size when the per-user
+/// breakdown is serialized.
+const MAX_BATCH_SIZE: usize = 135;
+
 #[near]
 impl SweatDefer for Contract {
     #[access_control_any(roles(Role::Oracle))]
     fn defer_batch(&mut self, steps_batch: Vec<(AccountId, u32)>) -> PromiseOrValue<()> {
         self.assert_feature_enabled(Feature::Minting);
+        require!(
+            steps_batch.len() <= MAX_BATCH_SIZE,
+            "Batch size exceeds the maximum allowed"
+        );
         require!(
             env::prepaid_gas() > GAS_FOR_DEFER,
             "Not enough gas to complete the operation"
