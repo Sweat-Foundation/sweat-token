@@ -319,6 +319,28 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "Empty steps batch")]
+    fn defer_batch_rejects_empty_batch() {
+        testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
+        let mut token = Contract::new(sweat_holding(), sweat_the_token(), vec![], vec![], vec![], vec![]);
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
+
+        testing_env!(get_context(sweat_the_token(), sweat_oracle()).build());
+        let _ = token.defer_batch(vec![]);
+    }
+
+    #[test]
+    #[should_panic(expected = "Step count must not be zero")]
+    fn defer_batch_rejects_zero_step_count() {
+        testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
+        let mut token = Contract::new(sweat_holding(), sweat_the_token(), vec![], vec![], vec![], vec![]);
+        token.acl_grant_role(Role::Oracle.into(), sweat_oracle());
+
+        testing_env!(get_context(sweat_the_token(), sweat_oracle()).build());
+        let _ = token.defer_batch(vec![(user1(), 0)]);
+    }
+
+    #[test]
     fn burn() {
         testing_env!(get_context(sweat_the_token(), sweat_the_token()).build());
         let mut token = Contract::new(sweat_holding(), sweat_the_token(), vec![], vec![], vec![], vec![]);

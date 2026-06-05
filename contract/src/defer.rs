@@ -98,6 +98,7 @@ impl SweatDefer for Contract {
     #[access_control_any(roles(Role::Oracle))]
     fn defer_batch(&mut self, steps_batch: Vec<(AccountId, u32)>) -> PromiseOrValue<()> {
         self.assert_feature_enabled(Feature::Minting);
+        require!(!steps_batch.is_empty(), "Empty steps batch");
         require!(
             steps_batch.len() <= MAX_BATCH_SIZE,
             "Batch size exceeds the maximum allowed"
@@ -115,6 +116,8 @@ impl SweatDefer for Contract {
         let mut steps_increment: u64 = 0;
 
         for (account_id, step_count) in steps_batch {
+            require!(step_count != 0, "Step count must not be zero");
+
             if self.is_restricted(&account_id) {
                 continue;
             }

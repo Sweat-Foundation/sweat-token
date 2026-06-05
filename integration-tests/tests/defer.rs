@@ -95,12 +95,7 @@ async fn test_defer_batch_skips_denylisted_users() -> anyhow::Result<()> {
     // loop in defer_batch must skip alice (nothing recorded for her to claim)
     // while still recording bob. bob is the positive control proving the batch
     // isn't simply rejected wholesale.
-    let context = Context::builder()
-        .with_oracle()
-        .with_claim()
-        .with_bob()
-        .build()
-        .await?;
+    let context = Context::builder().with_oracle().with_claim().with_bob().build().await?;
 
     info!("call acl_grant_role(DenylistManager, sweat) [signer=contract, super-admin]");
     context
@@ -276,6 +271,57 @@ async fn test_set_holding_account_id_rejects_non_admin() -> anyhow::Result<()> {
     assert_eq!(holding, context.claim().id().to_string());
     info!(%holding, "holding account unchanged");
 
+    Ok(())
+}
+
+#[tokio::test]
+#[tracing::instrument]
+async fn test_defer_batch_rejects_empty_batch() -> anyhow::Result<()> {
+    let context = Context::builder().with_oracle().with_claim().build().await?;
+
+    info!("call defer_batch([]) [signer=oracle] — empty batch must be rejected");
+    let result = context
+        .oracle()
+        .call(context.sweat.id(), "defer_batch")
+        .args_json(json!({ "steps_batch": [] }))
+        .max_gas()
+        .transact()
+        .await?
+        .into_result();
+    assert!(result.has_panic("Empty steps batch"));
+    info!("defer_batch: {result:?}");
+
+    info!("done");
+    Ok(())
+}
+
+#[tokio::test]
+#[tracing::instrument]
+async fn test_defer_batch_rejects_zero_step_count() -> anyhow::Result<()> {
+    let context = Context::builder().with_oracle().with_claim().build().await?;
+
+    info!("call defer_batch([(alice, 0)]) [signer=oracle] — zero step count must be rejected");
+    let result = context
+        .oracle()
+        .call(context.sweat.id(), "defer_batch")
+        .args_json(json!({ "steps_batch": [[context.alice.id(), 0]] }))
+        .max_gas()
+        .transact()
+        .await?
+        .into_result();
+    assert!(result.has_panic("Step count must not be zero"));
+    info!("defer_batch: {result:?}");
+
+    info!("view get_steps_since_tge [unchanged after rejected batch]");
+    let steps: String = context.sweat.view("get_steps_since_tge").await?.json()?;
+    assert_eq!(
+        steps.parse::<u64>()?,
+        0,
+        "a rejected batch must not advance the steps counter"
+    );
+    info!(value = %steps, "steps unchanged");
+
+    info!("done");
     Ok(())
 }
 
