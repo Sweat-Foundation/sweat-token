@@ -78,9 +78,9 @@ use near_sdk::{
 use crate::{
     api::{RestrictionApi, SweatDefer},
     core::InternalDeposit,
-    Contract, ContractExt, Role,
+    Contract, ContractExt, Feature, Role,
 };
-use near_plugins::{access_control_any, pause, AccessControllable, Pausable};
+use near_plugins::{access_control_any, AccessControllable};
 
 const GAS_FOR_DEFER_CALLBACK: Gas = Gas::from_tgas(5);
 const GAS_FOR_DEFER: Gas = Gas::from_tgas(30);
@@ -88,8 +88,8 @@ const GAS_FOR_DEFER: Gas = Gas::from_tgas(30);
 #[near]
 impl SweatDefer for Contract {
     #[access_control_any(roles(Role::Oracle))]
-    #[pause(name = "minting")]
     fn defer_batch(&mut self, steps_batch: Vec<(AccountId, u32)>) -> PromiseOrValue<()> {
+        self.assert_feature_enabled(Feature::Minting);
         require!(
             env::prepaid_gas() > GAS_FOR_DEFER,
             "Not enough gas to complete the operation"

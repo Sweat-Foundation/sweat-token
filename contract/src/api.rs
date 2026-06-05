@@ -3,6 +3,8 @@ use near_sdk::{
     AccountId, PromiseOrValue,
 };
 
+use crate::pause::Feature;
+
 pub trait SweatApi {
     fn new(
         holding_account_id: AccountId,
@@ -25,6 +27,18 @@ pub trait SweatApi {
 pub trait RestrictionApi {
     fn is_restricted(&self, account_id: &AccountId) -> bool;
     fn set_restricted(&mut self, account_id: &AccountId, is_restricted: bool);
+}
+
+/// Per-feature pause controls. See the [`crate::pause`] module.
+pub trait PauseApi {
+    /// Pauses each of `features`. Requires the `PauseManager` role. Returns
+    /// whether the paused set changed.
+    fn pause_features(&mut self, features: Vec<Feature>) -> bool;
+    /// Unpauses each of `features`. Requires the `UnpauseManager` role. Returns
+    /// whether the paused set changed.
+    fn unpause_features(&mut self, features: Vec<Feature>) -> bool;
+    fn is_feature_paused(&self, feature: Feature) -> bool;
+    fn get_paused_features(&self) -> Vec<Feature>;
 }
 
 /// Token-minting API.

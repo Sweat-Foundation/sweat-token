@@ -70,6 +70,7 @@ impl Contract {
             steps_since_tge: old.steps_since_tge,
             denylist: old.denylist,
             holding_account_id,
+            paused_features: 0,
         };
 
         contract.init_acl(

@@ -177,16 +177,16 @@ async fn test_acl_set_restricted() -> anyhow::Result<()> {
 async fn test_acl_pause_feature() -> anyhow::Result<()> {
     let context = Context::builder().build().await?;
 
-    info!("call pa_pause_feature(ALL) [signer=alice, unauthorized]");
+    info!("call pause_features(ALL) [signer=alice, unauthorized]");
     let result = context
         .alice
-        .call(context.sweat.id(), "pa_pause_feature")
-        .args_json(json!({ "key": "ALL" }))
+        .call(context.sweat.id(), "pause_features")
+        .args_json(json!({ "features": ["token", "minting"] }))
         .transact()
         .await?
         .into_result();
-    assert!(result.has_panic("Insufficient permissions for method pa_pause_feature restricted by access control."));
-    info!("pa_pause_feature: {result:?}");
+    assert!(result.has_panic("Insufficient permissions for method pause_features restricted by access control."));
+    info!("pause_features: {result:?}");
 
     info!("call acl_grant_role(PauseManager, alice) [signer=contract, super-admin]");
     let granted: Option<bool> = context
@@ -202,16 +202,16 @@ async fn test_acl_pause_feature() -> anyhow::Result<()> {
     assert_eq!(granted, Some(true));
     info!("acl_grant_role: {granted:?}");
 
-    info!("call pa_pause_feature(ALL) [signer=alice, authorized]");
+    info!("call pause_features(ALL) [signer=alice, authorized]");
     let is_paused: bool = context
         .alice
-        .call(context.sweat.id(), "pa_pause_feature")
-        .args_json(json!({ "key": "ALL" }))
+        .call(context.sweat.id(), "pause_features")
+        .args_json(json!({ "features": ["token", "minting"] }))
         .transact()
         .await?
         .json()?;
     assert!(is_paused);
-    info!("pa_pause_feature: {is_paused:?}");
+    info!("pause_features: {is_paused:?}");
 
     Ok(())
 }
@@ -221,16 +221,16 @@ async fn test_acl_pause_feature() -> anyhow::Result<()> {
 async fn test_acl_unpause_feature() -> anyhow::Result<()> {
     let context = Context::builder().build().await?;
 
-    info!("call pa_unpause_feature(ALL) [signer=alice, unauthorized]");
+    info!("call unpause_features(ALL) [signer=alice, unauthorized]");
     let result = context
         .alice
-        .call(context.sweat.id(), "pa_unpause_feature")
-        .args_json(json!({ "key": "ALL" }))
+        .call(context.sweat.id(), "unpause_features")
+        .args_json(json!({ "features": ["token", "minting"] }))
         .transact()
         .await?
         .into_result();
-    assert!(result.has_panic("Insufficient permissions for method pa_unpause_feature restricted by access control."));
-    info!("pa_unpause_feature: {result:?}");
+    assert!(result.has_panic("Insufficient permissions for method unpause_features restricted by access control."));
+    info!("unpause_features: {result:?}");
 
     info!("call acl_grant_role(PauseManager, alice) [signer=contract, super-admin]");
     let granted: Option<bool> = context
@@ -260,27 +260,27 @@ async fn test_acl_unpause_feature() -> anyhow::Result<()> {
     assert_eq!(granted, Some(true));
     info!("acl_grant_role: {granted:?}");
 
-    info!("call pa_pause_feature(ALL) [signer=alice, authorized]");
+    info!("call pause_features(ALL) [signer=alice, authorized]");
     let is_paused: bool = context
         .alice
-        .call(context.sweat.id(), "pa_pause_feature")
-        .args_json(json!({ "key": "ALL" }))
+        .call(context.sweat.id(), "pause_features")
+        .args_json(json!({ "features": ["token", "minting"] }))
         .transact()
         .await?
         .json()?;
     assert!(is_paused);
-    info!("pa_pause_feature: {is_paused:?}");
+    info!("pause_features: {is_paused:?}");
 
-    info!("call pa_unpause_feature(ALL) [signer=alice, authorized]");
+    info!("call unpause_features(ALL) [signer=alice, authorized]");
     let is_unpaused: bool = context
         .alice
-        .call(context.sweat.id(), "pa_unpause_feature")
-        .args_json(json!({ "key": "ALL" }))
+        .call(context.sweat.id(), "unpause_features")
+        .args_json(json!({ "features": ["token", "minting"] }))
         .transact()
         .await?
         .json()?;
     assert!(is_unpaused);
-    info!("pa_unpause_feature: {is_unpaused:?}");
+    info!("unpause_features: {is_unpaused:?}");
 
     Ok(())
 }

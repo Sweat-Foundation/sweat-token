@@ -4,10 +4,9 @@ extern crate static_assertions;
 use api::{Payout, RestrictionApi, SweatApi};
 use event::Event;
 use near_contract_standards::fungible_token::{events::FtBurn, FungibleToken};
-use near_plugins::{access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable};
+use near_plugins::{access_control, access_control_any, AccessControlRole, AccessControllable};
 use near_sdk::{
     assert_one_yocto,
-    borsh::BorshDeserialize,
     collections::UnorderedSet,
     env,
     json_types::{U128, U64},
@@ -24,7 +23,10 @@ mod integration;
 mod math;
 mod meta;
 mod migration;
+mod pause;
 mod storage;
+
+pub use pause::Feature;
 
 #[derive(AccessControlRole, Deserialize, Serialize, Clone, Copy)]
 #[serde(crate = "near_sdk::serde")]
@@ -37,8 +39,7 @@ pub enum Role {
 
 #[near(contract_state)]
 #[access_control(role_type(Role))]
-#[derive(Pausable, PanicOnDefault)]
-#[pausable(pause_roles(Role::PauseManager), unpause_roles(Role::UnpauseManager))]
+#[derive(PanicOnDefault)]
 pub struct Contract {
     token: FungibleToken,
     steps_since_tge: U64,
@@ -47,6 +48,8 @@ pub struct Contract {
     /// minted batch until end users claim their rewards. See the [`defer`]
     /// module docs for the full claim flow and trust model.
     holding_account_id: AccountId,
+    /// Bitmask of paused [`Feature`]s. See the [`pause`] module.
+    paused_features: u32,
 }
 
 #[near]
@@ -65,6 +68,7 @@ impl SweatApi for Contract {
             steps_since_tge: U64::from(0),
             denylist: UnorderedSet::new(b"d"),
             holding_account_id,
+            paused_features: 0,
         };
 
         contract.init_acl(
@@ -87,9 +91,9 @@ impl SweatApi for Contract {
         self.holding_account_id.clone()
     }
 
-    #[pause(name = "token")]
     #[payable]
     fn burn(&mut self, amount: U128) {
+        self.assert_feature_enabled(Feature::Token);
         assert_one_yocto();
         self.assert_not_in_denylist(vec![&env::predecessor_account_id()]);
 

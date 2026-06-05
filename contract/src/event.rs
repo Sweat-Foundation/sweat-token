@@ -13,6 +13,8 @@
 
 use near_sdk::{env, serde::Serialize, serde_json, AccountIdRef};
 
+use crate::Feature;
+
 const STANDARD: &str = "sweat";
 const VERSION: &str = "1.0.0";
 
@@ -29,6 +31,13 @@ pub enum Event<'a> {
         /// The account's new restriction status: `true` if it was added to the
         /// denylist, `false` if it was removed.
         is_restricted: bool,
+    },
+    /// Logged when a [`Feature`] is paused or unpaused.
+    FeaturePauseChanged {
+        feature: Feature,
+        /// The feature's new state: `true` if it was paused, `false` if it was
+        /// unpaused.
+        paused: bool,
     },
 }
 
@@ -78,6 +87,24 @@ mod tests {
         assert_eq!(
             test_utils::get_logs()[0],
             r#"EVENT_JSON:{"standard":"sweat","version":"1.0.0","event":"restriction_changed","data":{"account_id":"bob","is_restricted":false}}"#
+        );
+    }
+
+    #[test]
+    fn feature_paused() {
+        Event::FeaturePauseChanged { feature: Feature::Token, paused: true }.emit();
+        assert_eq!(
+            test_utils::get_logs()[0],
+            r#"EVENT_JSON:{"standard":"sweat","version":"1.0.0","event":"feature_pause_changed","data":{"feature":"token","paused":true}}"#
+        );
+    }
+
+    #[test]
+    fn feature_unpaused() {
+        Event::FeaturePauseChanged { feature: Feature::Minting, paused: false }.emit();
+        assert_eq!(
+            test_utils::get_logs()[0],
+            r#"EVENT_JSON:{"standard":"sweat","version":"1.0.0","event":"feature_pause_changed","data":{"feature":"minting","paused":false}}"#
         );
     }
 }

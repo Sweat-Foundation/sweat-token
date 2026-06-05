@@ -1,21 +1,19 @@
 use near_contract_standards::fungible_token::{core::FungibleTokenCore, resolver::FungibleTokenResolver, Balance};
-use near_plugins::{pause, Pausable};
 use near_sdk::{env, json_types::U128, near, AccountId, PromiseOrValue};
 
-use crate::{Contract, ContractExt};
+use crate::{Contract, ContractExt, Feature};
 
 #[near]
 impl FungibleTokenCore for Contract {
     #[payable]
-    #[pause(name = "token")]
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>) {
+        self.assert_feature_enabled(Feature::Token);
         self.assert_not_in_denylist(vec![&env::predecessor_account_id(), &receiver_id]);
 
         self.token.ft_transfer(receiver_id, amount, memo);
     }
 
     #[payable]
-    #[pause(name = "token")]
     fn ft_transfer_call(
         &mut self,
         receiver_id: AccountId,
@@ -23,6 +21,7 @@ impl FungibleTokenCore for Contract {
         memo: Option<String>,
         msg: String,
     ) -> PromiseOrValue<U128> {
+        self.assert_feature_enabled(Feature::Token);
         self.assert_not_in_denylist(vec![&env::predecessor_account_id(), &receiver_id]);
 
         self.token.ft_transfer_call(receiver_id, amount, memo, msg)

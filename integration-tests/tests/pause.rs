@@ -10,16 +10,16 @@ use common::{panic::PanicFinder, prepare::Context};
 async fn test_pause_all() -> anyhow::Result<()> {
     let context = Context::builder().with_oracle().with_claim().with_bob().build().await?;
 
-    info!("call pa_pause_feature(ALL) [signer=alice, unauthorized]");
+    info!("call pause_features(ALL) [signer=alice, unauthorized]");
     let result = context
         .alice
-        .call(context.sweat.id(), "pa_pause_feature")
-        .args_json(json!({ "key": "ALL" }))
+        .call(context.sweat.id(), "pause_features")
+        .args_json(json!({ "features": ["token", "minting"] }))
         .transact()
         .await?
         .into_result();
-    assert!(result.has_panic("Insufficient permissions for method pa_pause_feature restricted by access control."));
-    info!("pa_pause_feature: {result:?}");
+    assert!(result.has_panic("Insufficient permissions for method pause_features restricted by access control."));
+    info!("pause_features: {result:?}");
 
     info!("call acl_grant_role(PauseManager, alice) [signer=contract]");
     let role_is_granted: bool = context
@@ -49,27 +49,27 @@ async fn test_pause_all() -> anyhow::Result<()> {
     assert!(!role_is_granted);
     info!("acl_grant_role: {role_is_granted:?}");
 
-    info!("call pa_pause_feature(ALL) [signer=alice]");
+    info!("call pause_features(ALL) [signer=alice]");
     let is_paused: bool = context
         .alice
-        .call(context.sweat.id(), "pa_pause_feature")
-        .args_json(json!({ "key": "ALL" }))
+        .call(context.sweat.id(), "pause_features")
+        .args_json(json!({ "features": ["token", "minting"] }))
         .transact()
         .await?
         .json()?;
     assert!(is_paused);
-    info!("pa_pause_feature: {is_paused:?}");
+    info!("pause_features: {is_paused:?}");
 
-    info!("call pa_pause_feature(ALL) [signer=alice] — idempotent");
+    info!("call pause_features(ALL) [signer=alice] — idempotent");
     let is_paused: bool = context
         .alice
-        .call(context.sweat.id(), "pa_pause_feature")
-        .args_json(json!({ "key": "ALL" }))
+        .call(context.sweat.id(), "pause_features")
+        .args_json(json!({ "features": ["token", "minting"] }))
         .transact()
         .await?
         .json()?;
     assert!(!is_paused);
-    info!("pa_pause_feature: {is_paused:?}");
+    info!("pause_features: {is_paused:?}");
 
     info!("call ft_transfer(bob, 1000000000000000000) [signer=alice] — pause check fires before balance check");
     let result = context
@@ -83,7 +83,7 @@ async fn test_pause_all() -> anyhow::Result<()> {
         .transact()
         .await?
         .into_result();
-    assert!(result.has_panic("Method is paused"));
+    assert!(result.has_panic("Feature 'token' is paused"));
     info!("ft_transfer: {result:?}");
 
     info!("call defer_batch([(alice, 10_000)]) [signer=oracle]");
@@ -95,19 +95,19 @@ async fn test_pause_all() -> anyhow::Result<()> {
         .transact()
         .await?
         .into_result();
-    assert!(result.has_panic("Method is paused"));
+    assert!(result.has_panic("Feature 'minting' is paused"));
     info!("defer_batch: {result:?}");
 
-    info!("call pa_unpause_feature(ALL) [signer=alice, unauthorized]");
+    info!("call unpause_features(ALL) [signer=alice, unauthorized]");
     let result = context
         .alice
-        .call(context.sweat.id(), "pa_unpause_feature")
-        .args_json(json!({ "key": "ALL" }))
+        .call(context.sweat.id(), "unpause_features")
+        .args_json(json!({ "features": ["token", "minting"] }))
         .transact()
         .await?
         .into_result();
-    assert!(result.has_panic("Insufficient permissions for method pa_unpause_feature restricted by access control."));
-    info!("pa_unpause_feature: {result:?}");
+    assert!(result.has_panic("Insufficient permissions for method unpause_features restricted by access control."));
+    info!("unpause_features: {result:?}");
 
     info!("call acl_grant_role(UnpauseManager, alice) [signer=contract]");
     let role_is_granted: bool = context
@@ -123,27 +123,27 @@ async fn test_pause_all() -> anyhow::Result<()> {
     assert!(role_is_granted);
     info!("acl_grant_role: {role_is_granted:?}");
 
-    info!("call pa_unpause_feature(ALL) [signer=alice]");
+    info!("call unpause_features(ALL) [signer=alice]");
     let is_unpaused: bool = context
         .alice
-        .call(context.sweat.id(), "pa_unpause_feature")
-        .args_json(json!({ "key": "ALL" }))
+        .call(context.sweat.id(), "unpause_features")
+        .args_json(json!({ "features": ["token", "minting"] }))
         .transact()
         .await?
         .json()?;
     assert!(is_unpaused);
-    info!("pa_unpause_feature: {is_unpaused:?}");
+    info!("unpause_features: {is_unpaused:?}");
 
-    info!("call pa_unpause_feature(ALL) [signer=alice] — idempotent");
+    info!("call unpause_features(ALL) [signer=alice] — idempotent");
     let is_unpaused: bool = context
         .alice
-        .call(context.sweat.id(), "pa_unpause_feature")
-        .args_json(json!({ "key": "ALL" }))
+        .call(context.sweat.id(), "unpause_features")
+        .args_json(json!({ "features": ["token", "minting"] }))
         .transact()
         .await?
         .json()?;
     assert!(!is_unpaused);
-    info!("pa_unpause_feature: {is_unpaused:?}");
+    info!("unpause_features: {is_unpaused:?}");
 
     info!("call defer_batch([(alice, 10_000)]) [signer=oracle] — minting works after unpause");
     context
@@ -177,16 +177,16 @@ async fn test_pause_minting() -> anyhow::Result<()> {
     assert!(role_is_granted);
     info!("acl_grant_role: {role_is_granted:?}");
 
-    info!("call pa_pause_feature(minting) [signer=alice]");
+    info!("call pause_features(minting) [signer=alice]");
     let is_paused: bool = context
         .alice
-        .call(context.sweat.id(), "pa_pause_feature")
-        .args_json(json!({ "key": "minting" }))
+        .call(context.sweat.id(), "pause_features")
+        .args_json(json!({ "features": ["minting"] }))
         .transact()
         .await?
         .json()?;
     assert!(is_paused);
-    info!("pa_pause_feature: {is_paused:?}");
+    info!("pause_features: {is_paused:?}");
 
     info!("call defer_batch([(alice, 10_000)]) [signer=oracle]");
     let result = context
@@ -197,7 +197,7 @@ async fn test_pause_minting() -> anyhow::Result<()> {
         .transact()
         .await?
         .into_result();
-    assert!(result.has_panic("Method is paused"));
+    assert!(result.has_panic("Feature 'minting' is paused"));
     info!("defer_batch: {result:?}");
 
     info!("call acl_grant_role(UnpauseManager, alice) [signer=contract]");
@@ -214,16 +214,16 @@ async fn test_pause_minting() -> anyhow::Result<()> {
     assert!(role_is_granted);
     info!("acl_grant_role: {role_is_granted:?}");
 
-    info!("call pa_unpause_feature(minting) [signer=alice]");
+    info!("call unpause_features(minting) [signer=alice]");
     let is_unpaused: bool = context
         .alice
-        .call(context.sweat.id(), "pa_unpause_feature")
-        .args_json(json!({ "key": "minting" }))
+        .call(context.sweat.id(), "unpause_features")
+        .args_json(json!({ "features": ["minting"] }))
         .transact()
         .await?
         .json()?;
     assert!(is_unpaused);
-    info!("pa_unpause_feature: {is_unpaused:?}");
+    info!("unpause_features: {is_unpaused:?}");
 
     info!("call defer_batch([(alice, 10_000)]) [signer=oracle] — minting works after unpause");
     context
@@ -257,16 +257,16 @@ async fn test_pause_token() -> anyhow::Result<()> {
     assert!(role_is_granted);
     info!("acl_grant_role: {role_is_granted:?}");
 
-    info!("call pa_pause_feature(token) [signer=alice]");
+    info!("call pause_features(token) [signer=alice]");
     let is_paused: bool = context
         .alice
-        .call(context.sweat.id(), "pa_pause_feature")
-        .args_json(json!({ "key": "token" }))
+        .call(context.sweat.id(), "pause_features")
+        .args_json(json!({ "features": ["token"] }))
         .transact()
         .await?
         .json()?;
     assert!(is_paused);
-    info!("pa_pause_feature: {is_paused:?}");
+    info!("pause_features: {is_paused:?}");
 
     info!("call ft_transfer(bob, 1000000000000000000) [signer=alice] — pause check fires before balance check");
     let result = context
@@ -280,7 +280,7 @@ async fn test_pause_token() -> anyhow::Result<()> {
         .transact()
         .await?
         .into_result();
-    assert!(result.has_panic("Method is paused"));
+    assert!(result.has_panic("Feature 'token' is paused"));
     info!("ft_transfer: {result:?}");
 
     info!("call ft_transfer_call(bob, 1000000000000000000) [signer=alice]");
@@ -297,7 +297,7 @@ async fn test_pause_token() -> anyhow::Result<()> {
         .transact()
         .await?
         .into_result();
-    assert!(result.has_panic("Method is paused"));
+    assert!(result.has_panic("Feature 'token' is paused"));
     info!("ft_transfer_call: {result:?}");
 
     info!("call burn(1000000000000000000) [signer=alice]");
@@ -308,7 +308,7 @@ async fn test_pause_token() -> anyhow::Result<()> {
         .transact()
         .await?
         .into_result();
-    assert!(result.has_panic("Method is paused"));
+    assert!(result.has_panic("Feature 'token' is paused"));
     info!("burn: {result:?}");
 
     info!("call storage_unregister(force=true) [signer=alice] — pause check fires before denylist check");
@@ -320,7 +320,7 @@ async fn test_pause_token() -> anyhow::Result<()> {
         .transact()
         .await?
         .into_result();
-    assert!(result.has_panic("Method is paused"));
+    assert!(result.has_panic("Feature 'token' is paused"));
     info!("storage_unregister: {result:?}");
 
     info!("call defer_batch([(alice, 10_000)]) [signer=oracle] — minting feature not paused, should succeed");
