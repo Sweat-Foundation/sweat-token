@@ -81,9 +81,7 @@ impl Contract {
     /// of any guarded method so it fires before other checks.
     pub(crate) fn assert_feature_enabled(&self, feature: Feature) {
         require!(
-            self.paused_features & feature.bit() == 0,
-            // Single quotes (not double) so the message survives debug-escaped
-            // substring matching in the integration tests' `has_panic`.
+            !self.is_feature_paused(feature),
             format!("Feature '{}' is paused", feature.name())
         );
     }
@@ -119,9 +117,7 @@ mod tests {
 
     use near_contract_standards::fungible_token::core::FungibleTokenCore;
     use near_plugins::AccessControllable;
-    use near_sdk::{
-        json_types::U128, test_utils::VMContextBuilder, testing_env, AccountId, NearToken,
-    };
+    use near_sdk::{json_types::U128, test_utils::VMContextBuilder, testing_env, AccountId, NearToken};
 
     use crate::{
         api::{PauseApi, SweatApi},
