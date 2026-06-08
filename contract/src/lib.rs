@@ -97,7 +97,12 @@ impl SweatApi for Contract {
         assert_one_yocto();
         self.assert_not_in_denylist(vec![&env::predecessor_account_id()]);
 
+        if amount.0 == 0 {
+            return;
+        }
+
         self.token.internal_withdraw(&env::predecessor_account_id(), amount.0);
+
         FtBurn {
             amount,
             owner_id: &env::predecessor_account_id(),

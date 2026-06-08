@@ -26,6 +26,10 @@ impl StorageManagement for Contract {
         self.token
             .internal_storage_unregister(force)
             .inspect(|(account_id, balance)| {
+                if *balance == 0 {
+                    return;
+                }
+
                 FtBurn {
                     owner_id: account_id,
                     amount: (*balance).into(),
