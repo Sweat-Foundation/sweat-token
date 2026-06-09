@@ -16,7 +16,7 @@ use near_sdk::{env, serde::Serialize, serde_json, AccountIdRef};
 use crate::Feature;
 
 const STANDARD: &str = "sweat";
-const VERSION: &str = "1.0.0";
+const VERSION: &str = "1.3.0";
 
 /// A SWEAT contract event. The variant name (snake_cased) becomes the NEP-297
 /// `event` discriminator and its fields the `data` payload.
@@ -45,7 +45,11 @@ impl Event<'_> {
     /// Emits the event through [`env::log_str`](near_sdk::env::log_str). This is
     /// required to ensure that the event is triggered and to consume the event.
     pub fn emit(self) {
-        let envelope = Envelope { standard: STANDARD, version: VERSION, event: self };
+        let envelope = Envelope {
+            standard: STANDARD,
+            version: VERSION,
+            event: self,
+        };
 
         // Events cannot fail to serialize so fine to panic on error
         #[allow(clippy::redundant_closure)]
@@ -73,38 +77,54 @@ mod tests {
     #[test]
     fn restriction_added() {
         let account_id = AccountIdRef::new_or_panic("bob");
-        Event::RestrictionChanged { account_id, is_restricted: true }.emit();
+        Event::RestrictionChanged {
+            account_id,
+            is_restricted: true,
+        }
+        .emit();
         assert_eq!(
             test_utils::get_logs()[0],
-            r#"EVENT_JSON:{"standard":"sweat","version":"1.0.0","event":"restriction_changed","data":{"account_id":"bob","is_restricted":true}}"#
+            r#"EVENT_JSON:{"standard":"sweat","version":"1.3.0","event":"restriction_changed","data":{"account_id":"bob","is_restricted":true}}"#
         );
     }
 
     #[test]
     fn restriction_removed() {
         let account_id = AccountIdRef::new_or_panic("bob");
-        Event::RestrictionChanged { account_id, is_restricted: false }.emit();
+        Event::RestrictionChanged {
+            account_id,
+            is_restricted: false,
+        }
+        .emit();
         assert_eq!(
             test_utils::get_logs()[0],
-            r#"EVENT_JSON:{"standard":"sweat","version":"1.0.0","event":"restriction_changed","data":{"account_id":"bob","is_restricted":false}}"#
+            r#"EVENT_JSON:{"standard":"sweat","version":"1.3.0","event":"restriction_changed","data":{"account_id":"bob","is_restricted":false}}"#
         );
     }
 
     #[test]
     fn feature_paused() {
-        Event::FeaturePauseChanged { feature: Feature::Token, paused: true }.emit();
+        Event::FeaturePauseChanged {
+            feature: Feature::Token,
+            paused: true,
+        }
+        .emit();
         assert_eq!(
             test_utils::get_logs()[0],
-            r#"EVENT_JSON:{"standard":"sweat","version":"1.0.0","event":"feature_pause_changed","data":{"feature":"token","paused":true}}"#
+            r#"EVENT_JSON:{"standard":"sweat","version":"1.3.0","event":"feature_pause_changed","data":{"feature":"token","paused":true}}"#
         );
     }
 
     #[test]
     fn feature_unpaused() {
-        Event::FeaturePauseChanged { feature: Feature::Minting, paused: false }.emit();
+        Event::FeaturePauseChanged {
+            feature: Feature::Minting,
+            paused: false,
+        }
+        .emit();
         assert_eq!(
             test_utils::get_logs()[0],
-            r#"EVENT_JSON:{"standard":"sweat","version":"1.0.0","event":"feature_pause_changed","data":{"feature":"minting","paused":false}}"#
+            r#"EVENT_JSON:{"standard":"sweat","version":"1.3.0","event":"feature_pause_changed","data":{"feature":"minting","paused":false}}"#
         );
     }
 }
