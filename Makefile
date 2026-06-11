@@ -3,7 +3,7 @@ help: ##@Miscellaneous Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
 install: ##@Miscellaneous Install dependencies
-	@npm i near-cli
+	@cargo install near-cli-rs
 	@cargo build
 
 build: ##@Build the contract locally.
@@ -27,18 +27,26 @@ cov: ##@Testing Run unit tests with coverage.
 	cargo llvm-cov --hide-instantiations --open
 
 test: ##@Testing Run unit tests.
-	cargo test --package sweat
+	cargo test --package contract
 
-integration: ##@Testing Run integration tests.
-	cargo test --package integration-tests
+integration: build-integration ##@Testing Run integration tests.
+	cd integration-tests && cargo test
 
 int: integration ##@Testing Shorthand for `integration`
+
+integration-log: build-integration ##@Testing Run integration tests with logs streamed (serial). Override level via RUST_LOG.
+	cd integration-tests && RUST_LOG=$${RUST_LOG:-info,near_workspaces=warn} cargo test -- --nocapture --test-threads=1
+
+int-log: integration-log ##@Testing Shorthand for `integration-log`
 
 fmt: ##@Chores Format the code using rustfmt nightly.
 	cargo +nightly fmt --all
 
 lint: ##@Chores Run lint checks with Clippy.
 	./scripts/lint.sh
+
+sync: ##@Chores Sync vendored near-contract-standards from upstream and re-apply my_custom_updates.patch.
+	./scripts/sync_vendor.sh
 
 HELP_FUN = \
     %help; while(<>){push@{$$help{$$2//'options'}},[$$1,$$3] \

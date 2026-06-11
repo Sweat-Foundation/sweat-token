@@ -4,25 +4,14 @@ version = "1.0.0"
 publish = false
 edition = "2021"
 
-[lib]
-name = "integration_tests"
-
 [dev-dependencies]
-near-workspaces = { workspace = true }
-near-sdk = { workspace = true }
-near-contract-standards = { workspace = true }
-anyhow = { workspace = true }
-tokio = { workspace = true }
+near-workspaces = "0.22.1"
+anyhow = "1.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+approx = "0.5"
 
-near-units = { workspace = true }
-borsh = "0.10.3"
-maplit = "1.0"
-tracing = "0.1.37"
-tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
-pkg-config = "0.3.1"
-
-[dependencies]
-async-trait = "0.1.73"
-
-sweat-model = { workspace = true, features = ["integration-test"] }
-integration-utils = { workspace = true }
+[workspace]
