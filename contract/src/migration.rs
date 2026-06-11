@@ -49,6 +49,11 @@ struct OldLookupMapAdapter {
 
 #[near]
 impl Contract {
+    /// Migrates the contract state from the previous layout to the current one.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the existing on-chain state cannot be read as [`OldContract`].
     #[private]
     #[init(ignore_state)]
     pub fn migrate(

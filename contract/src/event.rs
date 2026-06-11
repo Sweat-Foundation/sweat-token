@@ -8,7 +8,7 @@
 //! [events format (nep-297)]: https://github.com/near/NEPs/blob/master/specs/Standards/EventsFormat.md
 //!
 //! To add a new event, add a variant to [`Event`]. Serde maps the variant name
-//! (snake_cased) to the `event` field and its body to `data`; [`Event::emit`]
+//! (`snake_cased`) to the `event` field and its body to `data`; [`Event::emit`]
 //! wraps it in the `standard`/`version` envelope and logs it.
 
 use near_sdk::{env, serde::Serialize, serde_json, AccountIdRef};
@@ -18,7 +18,7 @@ use crate::Feature;
 const STANDARD: &str = "sweat";
 const VERSION: &str = "1.3.0";
 
-/// A SWEAT contract event. The variant name (snake_cased) becomes the NEP-297
+/// A SWEAT contract event. The variant name (`snake_cased`) becomes the NEP-297
 /// `event` discriminator and its fields the `data` payload.
 #[must_use = "don't forget to `.emit()` this event"]
 #[derive(Serialize, Debug)]
