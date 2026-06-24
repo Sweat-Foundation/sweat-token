@@ -4,7 +4,8 @@ extern crate static_assertions;
 use api::{Payout, RestrictionApi, SweatApi};
 use event::Event;
 use near_contract_standards::fungible_token::{events::FtBurn, FungibleToken};
-use near_plugins::{access_control, access_control_any, AccessControlRole, AccessControllable};
+use near_plugins::{access_control, access_control_any, AccessControlRole, AccessControllable, Upgradable};
+use near_sdk::borsh::BorshDeserialize;
 use near_sdk::{
     assert_one_yocto,
     collections::UnorderedSet,
@@ -35,11 +36,20 @@ pub enum Role {
     PauseManager,
     UnpauseManager,
     DenylistManager,
+    StagingManager,
+    UpgradeManager,
 }
 
-#[near(contract_state)]
+#[derive(PanicOnDefault, Upgradable)]
 #[access_control(role_type(Role))]
-#[derive(PanicOnDefault)]
+#[upgradable(access_control_roles(
+    code_stagers(Role::StagingManager),
+    code_deployers(Role::UpgradeManager),
+    duration_initializers(Role::UpgradeManager),
+    duration_update_stagers(Role::UpgradeManager),
+    duration_update_appliers(Role::UpgradeManager),
+))]
+#[near(contract_state)]
 pub struct Contract {
     token: FungibleToken,
     steps_since_tge: U64,
