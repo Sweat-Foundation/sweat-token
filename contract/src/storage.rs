@@ -16,8 +16,8 @@ impl StorageManagement for Contract {
     }
 
     #[payable]
-    #[allow(clippy::used_underscore_binding)]
-    fn storage_unregister(&mut self, _force: Option<bool>) -> bool {
+    #[allow(unused_variables)]
+    fn storage_unregister(&mut self, force: Option<bool>) -> bool {
         // Unregistering is intentionally disabled: the Sweat Foundation
         // subsidizes the storage of accounts created with Sweat Wallet, so we
         // don't allow users to unregister and reclaim their staked funds.
