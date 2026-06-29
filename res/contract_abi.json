@@ -2,12 +2,12 @@
   "schema_version": "0.4.0",
   "metadata": {
     "name": "contract",
-    "version": "1.3.0",
+    "version": "1.3.1",
     "build": {
       "compiler": "rustc 1.86.0",
       "builder": "cargo-near cargo-near-build 0.11.0"
     },
-    "wasm_hash": "5Lnvs4LPvNJWr79C1Ry2ktd2ffrf2CvbeiCmq12wHsSH"
+    "wasm_hash": "GmVHEmAEZx6FjHiKJJbDVPRF3cNdCfYAYDoJJzBGk2Vt"
   },
   "body": {
     "functions": [
