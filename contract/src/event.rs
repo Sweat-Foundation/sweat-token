@@ -16,7 +16,7 @@ use near_sdk::{env, serde::Serialize, serde_json, AccountIdRef};
 use crate::Feature;
 
 const STANDARD: &str = "sweat";
-const VERSION: &str = "1.3.1";
+const VERSION: &str = "1.3.2";
 
 /// A SWEAT contract event. The variant name (`snake_cased`) becomes the NEP-297
 /// `event` discriminator and its fields the `data` payload.
@@ -84,7 +84,7 @@ mod tests {
         .emit();
         assert_eq!(
             test_utils::get_logs()[0],
-            r#"EVENT_JSON:{"standard":"sweat","version":"1.3.1","event":"restriction_changed","data":{"account_id":"bob","is_restricted":true}}"#
+            r#"EVENT_JSON:{"standard":"sweat","version":"1.3.2","event":"restriction_changed","data":{"account_id":"bob","is_restricted":true}}"#
         );
     }
 
@@ -98,7 +98,7 @@ mod tests {
         .emit();
         assert_eq!(
             test_utils::get_logs()[0],
-            r#"EVENT_JSON:{"standard":"sweat","version":"1.3.1","event":"restriction_changed","data":{"account_id":"bob","is_restricted":false}}"#
+            r#"EVENT_JSON:{"standard":"sweat","version":"1.3.2","event":"restriction_changed","data":{"account_id":"bob","is_restricted":false}}"#
         );
     }
 
@@ -111,7 +111,7 @@ mod tests {
         .emit();
         assert_eq!(
             test_utils::get_logs()[0],
-            r#"EVENT_JSON:{"standard":"sweat","version":"1.3.1","event":"feature_pause_changed","data":{"feature":"token","paused":true}}"#
+            r#"EVENT_JSON:{"standard":"sweat","version":"1.3.2","event":"feature_pause_changed","data":{"feature":"token","paused":true}}"#
         );
     }
 
@@ -124,7 +124,7 @@ mod tests {
         .emit();
         assert_eq!(
             test_utils::get_logs()[0],
-            r#"EVENT_JSON:{"standard":"sweat","version":"1.3.1","event":"feature_pause_changed","data":{"feature":"minting","paused":false}}"#
+            r#"EVENT_JSON:{"standard":"sweat","version":"1.3.2","event":"feature_pause_changed","data":{"feature":"minting","paused":false}}"#
         );
     }
 }
