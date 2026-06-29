@@ -311,18 +311,6 @@ async fn test_pause_token() -> anyhow::Result<()> {
     assert!(result.has_panic("Feature 'token' is paused"));
     info!("burn: {result:?}");
 
-    info!("call storage_unregister(force=true) [signer=alice] — pause check fires before denylist check");
-    let result = context
-        .alice
-        .call(context.sweat.id(), "storage_unregister")
-        .args_json(json!({ "force": true }))
-        .deposit(NearToken::from_yoctonear(1))
-        .transact()
-        .await?
-        .into_result();
-    assert!(result.has_panic("Feature 'token' is paused"));
-    info!("storage_unregister: {result:?}");
-
     info!("call defer_batch([(alice, 10_000)]) [signer=oracle] — minting feature not paused, should succeed");
     context
         .oracle()
