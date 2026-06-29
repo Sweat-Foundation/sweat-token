@@ -7,7 +7,7 @@
       "compiler": "rustc 1.86.0",
       "builder": "cargo-near cargo-near-build 0.11.0"
     },
-    "wasm_hash": "8qN5Q5wxyzZ7ik1SkANXnPKk1AXb9MzoXDzhkD3tvXzW"
+    "wasm_hash": "5Lnvs4LPvNJWr79C1Ry2ktd2ffrf2CvbeiCmq12wHsSH"
   },
   "body": {
     "functions": [
@@ -868,6 +868,7 @@
       },
       {
         "name": "migrate",
+        "doc": " Migrates the contract state from the previous layout to the current one.\n\n # Panics\n\n Panics if the existing on-chain state cannot be read as [`OldContract`].",
         "kind": "call",
         "modifiers": [
           "init",
@@ -1253,6 +1254,169 @@
             "type": "boolean"
           }
         }
+      },
+      {
+        "name": "up_apply_update_staging_duration",
+        "kind": "call"
+      },
+      {
+        "name": "up_deploy_code",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "hash",
+              "type_schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "function_call_args",
+              "type_schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/FunctionCallArgs"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/Promise"
+          }
+        }
+      },
+      {
+        "name": "up_get_delay_status",
+        "kind": "view",
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/UpgradableDurationStatus"
+          }
+        }
+      },
+      {
+        "name": "up_init_staging_duration",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "staging_duration",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0.0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "up_stage_code",
+        "kind": "call"
+      },
+      {
+        "name": "up_stage_update_staging_duration",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "staging_duration",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0.0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "up_staged_code",
+        "kind": "view",
+        "result": {
+          "serialization_type": "borsh",
+          "type_schema": {
+            "declaration": "Option<Vec<u8>>",
+            "definitions": {
+              "()": {
+                "Primitive": 0
+              },
+              "Option<Vec<u8>>": {
+                "Enum": {
+                  "tag_width": 1,
+                  "variants": [
+                    [
+                      0,
+                      "None",
+                      "()"
+                    ],
+                    [
+                      1,
+                      "Some",
+                      "Vec<u8>"
+                    ]
+                  ]
+                }
+              },
+              "Vec<u8>": {
+                "Sequence": {
+                  "length_width": 4,
+                  "length_range": {
+                    "start": 0,
+                    "end": 4294967295
+                  },
+                  "elements": "u8"
+                }
+              },
+              "u8": {
+                "Primitive": 1
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "up_staged_code_hash",
+        "kind": "view",
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      {
+        "name": "up_storage_prefix",
+        "kind": "view",
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      {
+        "name": "up_verify_state",
+        "kind": "view"
       }
     ],
     "root_schema": {
@@ -1287,6 +1451,39 @@
               ]
             }
           ]
+        },
+        "FunctionCallArgs": {
+          "description": "Specifies a function call to be appended to the actions of a promise via [`near_sdk::Promise::function_call`]).",
+          "type": "object",
+          "required": [
+            "amount",
+            "arguments",
+            "function_name",
+            "gas"
+          ],
+          "properties": {
+            "amount": {
+              "description": "The amount of tokens to transfer to the receiver.",
+              "type": "string"
+            },
+            "arguments": {
+              "description": "The arguments to pass to the function.",
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint8",
+                "minimum": 0.0
+              }
+            },
+            "function_name": {
+              "description": "The name of the function to call.",
+              "type": "string"
+            },
+            "gas": {
+              "description": "The gas limit for the function call.",
+              "type": "string"
+            }
+          }
         },
         "FungibleTokenMetadata": {
           "type": "object",
@@ -1386,6 +1583,7 @@
             }
           }
         },
+        "Promise": true,
         "PromiseOrValueNull": {
           "type": "null"
         },
@@ -1421,6 +1619,43 @@
             },
             "min": {
               "type": "string"
+            }
+          }
+        },
+        "UpgradableDurationStatus": {
+          "type": "object",
+          "properties": {
+            "new_staging_duration": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "new_staging_duration_timestamp": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "staging_duration": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "staging_timestamp": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0.0
             }
           }
         }
