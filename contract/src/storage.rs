@@ -1,10 +1,7 @@
-use near_contract_standards::{
-    fungible_token::events::FtBurn,
-    storage_management::{StorageBalance, StorageBalanceBounds, StorageManagement},
-};
+use near_contract_standards::storage_management::{StorageBalance, StorageBalanceBounds, StorageManagement};
 use near_sdk::{env, near, AccountId, NearToken};
 
-use crate::{Contract, ContractExt, Feature};
+use crate::{Contract, ContractExt};
 
 #[near]
 impl StorageManagement for Contract {
@@ -19,25 +16,12 @@ impl StorageManagement for Contract {
     }
 
     #[payable]
+    #[allow(unused_variables)]
     fn storage_unregister(&mut self, force: Option<bool>) -> bool {
-        self.assert_feature_enabled(Feature::Token);
-        self.assert_not_in_denylist(vec![&env::predecessor_account_id()]);
-
-        self.token
-            .internal_storage_unregister(force)
-            .inspect(|(account_id, balance)| {
-                if *balance == 0 {
-                    return;
-                }
-
-                FtBurn {
-                    owner_id: account_id,
-                    amount: (*balance).into(),
-                    memo: None,
-                }
-                .emit();
-            })
-            .is_some()
+        // Unregistering is intentionally disabled: the Sweat Foundation
+        // subsidizes the storage of accounts created with Sweat Wallet, so we
+        // don't allow users to unregister and reclaim their staked funds.
+        env::panic_str("storage_unregister is disabled");
     }
 
     fn storage_balance_bounds(&self) -> StorageBalanceBounds {

@@ -7,7 +7,7 @@
       "compiler": "rustc 1.86.0",
       "builder": "cargo-near cargo-near-build 0.11.0"
     },
-    "wasm_hash": "GmVHEmAEZx6FjHiKJJbDVPRF3cNdCfYAYDoJJzBGk2Vt"
+    "wasm_hash": "5eVVDjnVTvVQP7oKbkDDyAA2LQvFodCy45xZqKhtsDCK"
   },
   "body": {
     "functions": [
@@ -1437,7 +1437,7 @@
           "description": "A contract feature that can be independently paused.\n\nSerialized in snake_case so call args read e.g. `{\"features\": [\"token\", \"minting\"]}`.",
           "oneOf": [
             {
-              "description": "Token movement: `ft_transfer`, `ft_transfer_call`, `burn`, `storage_unregister`.",
+              "description": "Token movement: `ft_transfer`, `ft_transfer_call`, `burn`.",
               "type": "string",
               "enum": [
                 "token"
