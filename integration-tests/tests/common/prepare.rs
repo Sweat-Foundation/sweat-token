@@ -210,6 +210,19 @@ fn sweat_wasm_path() -> PathBuf {
     )
 }
 
+/// Raw bytes of the sweat contract WASM the sandbox deploys. Exposed so upgrade
+/// tests can stage and re-deploy the contract over itself.
+pub fn sweat_wasm_bytes() -> Result<Vec<u8>> {
+    let path = sweat_wasm_path();
+    std::fs::read(&path).map_err(|e| {
+        anyhow!(
+            "failed to read sweat WASM at {} — did you run `make build-integration`? \
+             Override the path with the {SWEAT_WASM_ENV} env var. ({e})",
+            path.display()
+        )
+    })
+}
+
 fn claim_wasm_path() -> PathBuf {
     wasm_path(
         CLAIM_WASM_ENV,
