@@ -24,8 +24,7 @@ use crate::{api::PauseApi, event::Event, Contract, ContractExt, Role};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Feature {
-    /// Token movement: `ft_transfer`, `ft_transfer_call`, `burn`,
-    /// `storage_unregister`.
+    /// Token movement: `ft_transfer`, `ft_transfer_call`, `burn`.
     Token,
     /// Reward minting: `defer_batch`.
     Minting,
