@@ -1,38 +1,56 @@
-//! Privileged batch operations over token accounts.
+//! Batch operations over token accounts.
 //!
-//! Both methods are gated by the [`crate::Role::Oracle`] ACL role.
-//!
-//! - [`BatchApi::batch_ft_transfer`] moves tokens between arbitrary accounts
-//!   without their signatures. Every transfer runs in the same function call,
-//!   so the batch is atomic: one failing entry (insufficient balance,
-//!   unregistered receiver, ...) panics and reverts the whole batch.
-//!   Transfers are subject to the `token` pause but, unlike `ft_transfer`, not
-//!   to the denylist.
-//! - [`BatchApi::batch_storage_unregister`] removes zero-balance accounts from
-//!   the token state. The holding account is always skipped. Unlike NEP-145 `storage_unregister`, it does **not**
-//!   refund the storage deposit: the released NEAR stays on the contract
-//!   account. No event is emitted: NEP-141 defines none for removing a
-//!   zero-balance account.
-//!
-//! Every transfer emits its own standard NEP-141 `ft_transfer` event, so batch
-//! size is bounded by the runtime log limits (100 logs and 16 KiB of log text
-//! per receipt) as well as by gas.
+//! - [`BatchApi::batch_ft_transfer`] is a multi-receiver `ft_transfer`: the
+//!   caller sends tokens from its own account to several receivers in one
+//!   call. It has the same requirements as `ft_transfer` (1 yoctoNEAR deposit,
+//!   `token` pause, denylist on the sender and every receiver, registered
+//!   receivers). The batch is atomic: one failing entry panics and reverts the
+//!   whole batch. All transfers are reported in a single NEP-141
+//!   `ft_transfer` event whose `data` array holds one entry per transfer, so
+//!   batch size is bounded by gas and the 16 KiB per-receipt log limit.
+//! - [`BatchApi::batch_storage_unregister`] is gated by the
+//!   [`crate::Role::Oracle`] ACL role and removes zero-balance accounts from
+//!   the token state. The holding account is always skipped. Unlike NEP-145
+//!   `storage_unregister`, it does **not** refund the storage deposit: the
+//!   released NEAR stays on the contract account. No event is emitted: NEP-141
+//!   defines none for removing a zero-balance account.
 
+use near_contract_standards::fungible_token::events::FtTransfer;
 use near_plugins::{access_control_any, AccessControllable};
-use near_sdk::{json_types::U128, near, require, AccountId};
+use near_sdk::{assert_one_yocto, env, json_types::U128, near, require, AccountId};
 
 use crate::{api::BatchApi, Contract, ContractExt, Feature, Role};
 
 #[near]
 impl BatchApi for Contract {
-    #[access_control_any(roles(Role::Oracle))]
-    fn batch_ft_transfer(&mut self, transfers: Vec<(AccountId, AccountId, U128)>) {
+    #[payable]
+    fn batch_ft_transfer(&mut self, transfers: Vec<(AccountId, U128)>, memo: Option<String>) {
         self.assert_feature_enabled(Feature::Token);
+        assert_one_yocto();
         require!(!transfers.is_empty(), "Empty transfers batch");
 
-        for (sender_id, receiver_id, amount) in &transfers {
-            self.token.internal_transfer(sender_id, receiver_id, amount.0, None);
+        let sender_id = env::predecessor_account_id();
+        self.assert_not_in_denylist(vec![&sender_id]);
+
+        for (receiver_id, amount) in &transfers {
+            self.assert_not_in_denylist(vec![receiver_id]);
+            require!(&sender_id != receiver_id, "Sender and receiver should be different");
+            require!(amount.0 > 0, "The amount should be a positive number");
+
+            self.token.internal_withdraw(&sender_id, amount.0);
+            self.token.internal_deposit(receiver_id, amount.0);
         }
+
+        let events: Vec<FtTransfer> = transfers
+            .iter()
+            .map(|(receiver_id, amount)| FtTransfer {
+                old_owner_id: &sender_id,
+                new_owner_id: receiver_id,
+                amount: *amount,
+                memo: memo.as_deref(),
+            })
+            .collect();
+        FtTransfer::emit_many(&events);
     }
 
     #[access_control_any(roles(Role::Oracle))]
@@ -60,7 +78,7 @@ mod tests {
 
     use near_contract_standards::{fungible_token::core::FungibleTokenCore, storage_management::StorageManagement};
     use near_plugins::AccessControllable;
-    use near_sdk::{json_types::U128, test_utils::VMContextBuilder, testing_env, AccountId};
+    use near_sdk::{json_types::U128, test_utils::VMContextBuilder, testing_env, AccountId, NearToken};
 
     use crate::{
         api::{BatchApi, PauseApi, RestrictionApi, SweatApi},
@@ -126,56 +144,58 @@ mod tests {
         testing_env!(get_context(sender).build());
     }
 
+    /// Calls as `sender` with the 1 yoctoNEAR deposit `batch_ft_transfer` requires.
+    fn as_sender(sender: AccountId) {
+        testing_env!(get_context(sender).attached_deposit(NearToken::from_yoctonear(1)).build());
+    }
+
     #[test]
     fn batch_ft_transfer_moves_balances() {
         let mut contract = setup();
         deposit(&mut contract, &user1(), 100);
         deposit(&mut contract, &user2(), 50);
 
-        contract.batch_ft_transfer(vec![
-            (user1(), user2(), U128(30)),
-            (user2(), user3(), U128(70)),
-            (user1(), user3(), U128(10)),
-        ]);
+        as_sender(user1());
+        contract.batch_ft_transfer(vec![(user2(), U128(30)), (user3(), U128(10)), (user2(), U128(5))], None);
 
-        assert_eq!(contract.ft_balance_of(user1()).0, 60);
-        assert_eq!(contract.ft_balance_of(user2()).0, 10);
-        assert_eq!(contract.ft_balance_of(user3()).0, 80);
+        assert_eq!(contract.ft_balance_of(user1()).0, 55);
+        assert_eq!(contract.ft_balance_of(user2()).0, 85);
+        assert_eq!(contract.ft_balance_of(user3()).0, 10);
         assert_eq!(contract.ft_total_supply().0, 150);
     }
 
     #[test]
-    fn batch_ft_transfer_emits_event_per_transfer() {
+    fn batch_ft_transfer_emits_single_event_with_all_transfers() {
         let mut contract = setup();
         deposit(&mut contract, &user1(), 100);
 
-        contract.batch_ft_transfer(vec![(user1(), user2(), U128(30)), (user1(), user3(), U128(20))]);
+        as_sender(user1());
+        contract.batch_ft_transfer(vec![(user2(), U128(30)), (user3(), U128(20))], Some("hi".to_string()));
 
-        let logs = near_sdk::test_utils::get_logs();
         assert_eq!(
-            logs,
+            near_sdk::test_utils::get_logs(),
             vec![
-                r#"EVENT_JSON:{"standard":"nep141","version":"1.0.0","event":"ft_transfer","data":[{"old_owner_id":"sweat_user1","new_owner_id":"sweat_user2","amount":"30"}]}"#,
-                r#"EVENT_JSON:{"standard":"nep141","version":"1.0.0","event":"ft_transfer","data":[{"old_owner_id":"sweat_user1","new_owner_id":"sweat_user3","amount":"20"}]}"#,
+                r#"EVENT_JSON:{"standard":"nep141","version":"1.0.0","event":"ft_transfer","data":[{"old_owner_id":"sweat_user1","new_owner_id":"sweat_user2","amount":"30","memo":"hi"},{"old_owner_id":"sweat_user1","new_owner_id":"sweat_user3","amount":"20","memo":"hi"}]}"#,
             ]
         );
     }
 
     #[test]
-    #[should_panic(expected = "Insufficient permissions for method batch_ft_transfer")]
-    fn batch_ft_transfer_requires_role() {
+    #[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+    fn batch_ft_transfer_requires_one_yocto() {
         let mut contract = setup();
         deposit(&mut contract, &user1(), 100);
 
         as_caller(user1());
-        contract.batch_ft_transfer(vec![(user1(), user2(), U128(30))]);
+        contract.batch_ft_transfer(vec![(user2(), U128(30))], None);
     }
 
     #[test]
     #[should_panic(expected = "Empty transfers batch")]
     fn batch_ft_transfer_rejects_empty_batch() {
         let mut contract = setup();
-        contract.batch_ft_transfer(vec![]);
+        as_sender(user1());
+        contract.batch_ft_transfer(vec![], None);
     }
 
     #[test]
@@ -184,7 +204,8 @@ mod tests {
         let mut contract = setup();
         deposit(&mut contract, &user1(), 100);
 
-        contract.batch_ft_transfer(vec![(user1(), user2(), U128(60)), (user1(), user3(), U128(60))]);
+        as_sender(user1());
+        contract.batch_ft_transfer(vec![(user2(), U128(60)), (user3(), U128(60))], None);
     }
 
     #[test]
@@ -193,7 +214,8 @@ mod tests {
         let mut contract = setup();
         deposit(&mut contract, &user1(), 100);
 
-        contract.batch_ft_transfer(vec![(user1(), account_id("sweat_unregistered"), U128(1))]);
+        as_sender(user1());
+        contract.batch_ft_transfer(vec![(account_id("sweat_unregistered"), U128(1))], None);
     }
 
     #[test]
@@ -202,7 +224,8 @@ mod tests {
         let mut contract = setup();
         deposit(&mut contract, &user1(), 100);
 
-        contract.batch_ft_transfer(vec![(user1(), user1(), U128(1))]);
+        as_sender(user1());
+        contract.batch_ft_transfer(vec![(user1(), U128(1))], None);
     }
 
     #[test]
@@ -211,22 +234,32 @@ mod tests {
         let mut contract = setup();
         deposit(&mut contract, &user1(), 100);
 
-        contract.batch_ft_transfer(vec![(user1(), user2(), U128(0))]);
+        as_sender(user1());
+        contract.batch_ft_transfer(vec![(user2(), U128(0))], None);
     }
 
     #[test]
-    fn batch_ft_transfer_ignores_denylist() {
+    #[should_panic(expected = "The account sweat_user1 is restricted")]
+    fn batch_ft_transfer_rejects_denylisted_sender() {
         let mut contract = setup();
         deposit(&mut contract, &user1(), 100);
         as_caller(token());
         contract.set_restricted(&user1(), true);
-        contract.set_restricted(&user2(), true);
 
-        as_caller(oracle());
-        contract.batch_ft_transfer(vec![(user1(), user2(), U128(30))]);
+        as_sender(user1());
+        contract.batch_ft_transfer(vec![(user2(), U128(1))], None);
+    }
 
-        assert_eq!(contract.ft_balance_of(user1()).0, 70);
-        assert_eq!(contract.ft_balance_of(user2()).0, 30);
+    #[test]
+    #[should_panic(expected = "The account sweat_user3 is restricted")]
+    fn batch_ft_transfer_rejects_denylisted_receiver() {
+        let mut contract = setup();
+        deposit(&mut contract, &user1(), 100);
+        as_caller(token());
+        contract.set_restricted(&user3(), true);
+
+        as_sender(user1());
+        contract.batch_ft_transfer(vec![(user2(), U128(1)), (user3(), U128(1))], None);
     }
 
     #[test]
@@ -237,8 +270,8 @@ mod tests {
         as_caller(token());
         contract.pause_features(vec![Feature::Token]);
 
-        as_caller(oracle());
-        contract.batch_ft_transfer(vec![(user1(), user2(), U128(1))]);
+        as_sender(user1());
+        contract.batch_ft_transfer(vec![(user2(), U128(1))], None);
     }
 
     #[test]

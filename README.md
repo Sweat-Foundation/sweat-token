@@ -21,10 +21,10 @@ Generation Event (TGE).
 - **Pausability.** `PauseManager` / `UnpauseManager` roles can pause/unpause
   groups of methods. Two pause groups are defined: `minting` (covers
   `defer_batch`) and `token` (covers transfers and `burn`).
-- **Batch account operations.** An `Oracle` can move tokens
-  between arbitrary accounts atomically (`batch_ft_transfer`) and remove
-  zero-balance accounts from the state (`batch_storage_unregister`; the
-  released storage deposit stays on the contract).
+- **Batch operations.** Any holder can send tokens to many receivers in one
+  atomic call (`batch_ft_transfer`). An `Oracle` can remove zero-balance
+  accounts from the state (`batch_storage_unregister`; the released storage
+  deposit stays on the contract).
 - **Access control.** All privileged roles (`Oracle`, `DenylistManager`,
   `PauseManager`, `UnpauseManager`, plus the Super Admin) are managed by the
   [`near-plugins`](https://github.com/aurora-is-near/near-plugins)
@@ -40,7 +40,7 @@ See `recon-report.md` for a deeper architectural walkthrough.
 ```
 contract/src/
 ├── api.rs         Public traits: SweatApi, RestrictionApi, SweatDefer, BatchApi
-├── batch.rs       batch_ft_transfer / batch_storage_unregister (Oracle)
+├── batch.rs       batch_ft_transfer / batch_storage_unregister (Oracle-only)
 ├── core.rs        NEP-141 transfers with denylist + pause checks
 ├── defer.rs       defer_batch / on_record — the deferred-mint flow
 ├── lib.rs         Contract state, init, plugin wiring
@@ -215,26 +215,25 @@ near contract call-function as-read-only $TOKEN_ACCOUNT_ID storage_balance_of \
   json-args '{"account_id":"user-1.testnet"}' network-config testnet now
 ```
 
-## Batch account operations
-
-Both methods require the `Oracle` role.
+## Batch operations
 
 ```bash
-# Atomic batch of [sender_id, receiver_id, amount] transfers. Any failing entry
-# (insufficient balance, unregistered receiver, paused "token" feature) reverts
-# the whole batch. The denylist is not checked. Each transfer emits its own
-# standard ft_transfer event, so size is bounded by gas and the per-receipt log
-# limits (100 logs, 16 KiB of log text).
+# Multi-receiver ft_transfer from the caller. Same rules as ft_transfer: 1 yoctoNEAR,
+# pause + denylist on sender & every receiver, receivers must be registered. The
+# batch is atomic — any failing entry reverts all of it. All transfers are reported
+# in one ft_transfer event (one `data` entry per transfer; `memo` goes into each).
+# Batch size is bounded by gas and the 16 KiB per-receipt log limit.
 near contract call-function as-transaction $TOKEN_ACCOUNT_ID batch_ft_transfer \
-  json-args '{"transfers":[["user-1.testnet","user-2.testnet","100"],["user-2.testnet","user-3.testnet","50"]]}' \
+  json-args '{"transfers":[["user-2.testnet","100"],["user-3.testnet","50"]],"memo":"hi"}' \
   prepaid-gas '300.0 Tgas' \
-  attached-deposit '0 NEAR' \
-  sign-as $ORACLE_ACCOUNT_ID \
+  attached-deposit '1 yoctoNEAR' \
+  sign-as <sender> \
   network-config testnet sign-with-keychain send
 
-# Remove zero-balance accounts from the state. The holding account, accounts
-# with a positive balance and unregistered accounts are skipped. Returns the removed accounts. No NEAR is
-# refunded: the storage deposit stays on the contract.
+# Remove zero-balance accounts from the state (requires the Oracle role). The
+# holding account, accounts with a positive balance and unregistered accounts are
+# skipped. Returns the removed accounts. No NEAR is refunded: the storage deposit
+# stays on the contract.
 near contract call-function as-transaction $TOKEN_ACCOUNT_ID batch_storage_unregister \
   json-args '{"account_ids":["user-1.testnet","user-2.testnet"]}' \
   prepaid-gas '300.0 Tgas' \

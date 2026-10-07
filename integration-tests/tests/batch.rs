@@ -1,11 +1,13 @@
+use near_workspaces::types::NearToken;
 use serde_json::{json, Value};
 use tracing::info;
 
 mod common;
 use common::{panic::PanicFinder, prepare::Context};
 
-/// `batch_ft_transfer` applies every transfer of a batch or none of them: a
-/// failing entry reverts the entries before it.
+/// `batch_ft_transfer` sends tokens from the caller to several receivers and
+/// applies every transfer of a batch or none of them: a failing entry reverts
+/// the entries before it.
 #[tokio::test]
 #[tracing::instrument]
 async fn test_batch_ft_transfer() -> anyhow::Result<()> {
@@ -31,15 +33,15 @@ async fn test_batch_ft_transfer() -> anyhow::Result<()> {
     assert!(oracle_balance > 0);
     info!("ft_balance_of(oracle): {oracle_balance}");
 
-    info!("call batch_ft_transfer [signer=alice, unauthorized]");
+    info!("call batch_ft_transfer [signer=oracle, no deposit]");
     let result = context
-        .alice
+        .oracle()
         .call(context.sweat.id(), "batch_ft_transfer")
-        .args_json(json!({ "transfers": [[context.oracle().id(), context.alice.id(), "1"]] }))
+        .args_json(json!({ "transfers": [[context.alice.id(), "1"]] }))
         .transact()
         .await?
         .into_result();
-    assert!(result.has_panic("Insufficient permissions for method batch_ft_transfer"));
+    assert!(result.has_panic("Requires attached deposit of exactly 1 yoctoNEAR"));
     info!("batch_ft_transfer: {result:?}");
 
     info!("call batch_ft_transfer [signer=oracle] — second entry targets unregistered bob");
@@ -47,9 +49,10 @@ async fn test_batch_ft_transfer() -> anyhow::Result<()> {
         .oracle()
         .call(context.sweat.id(), "batch_ft_transfer")
         .args_json(json!({ "transfers": [
-            [context.oracle().id(), context.alice.id(), "100"],
-            [context.alice.id(), context.bob().id(), "50"],
+            [context.alice.id(), "100"],
+            [context.bob().id(), "50"],
         ] }))
+        .deposit(NearToken::from_yoctonear(1))
         .transact()
         .await?
         .into_result();
@@ -69,13 +72,18 @@ async fn test_batch_ft_transfer() -> anyhow::Result<()> {
         .oracle()
         .call(context.sweat.id(), "batch_ft_transfer")
         .args_json(json!({ "transfers": [
-            [context.oracle().id(), context.alice.id(), "100"],
-            [context.alice.id(), context.claim().id(), "40"],
-        ] }))
+            [context.alice.id(), "100"],
+            [context.claim().id(), "40"],
+        ], "memo": "batch" }))
+        .deposit(NearToken::from_yoctonear(1))
         .transact()
         .await?
         .into_result()?;
     info!("batch_ft_transfer: {result:?}");
+
+    let logs = result.logs();
+    assert_eq!(logs.len(), 1, "all transfers must be reported in one ft_transfer event");
+    assert!(logs[0].starts_with(r#"EVENT_JSON:{"standard":"nep141","version":"1.0.0","event":"ft_transfer","data":[{"#));
 
     let oracle_after: String = context
         .sweat
@@ -83,7 +91,7 @@ async fn test_batch_ft_transfer() -> anyhow::Result<()> {
         .args_json(json!({ "account_id": context.oracle().id() }))
         .await?
         .json()?;
-    assert_eq!(oracle_after.parse::<u128>()?, oracle_balance - 100);
+    assert_eq!(oracle_after.parse::<u128>()?, oracle_balance - 140);
 
     let alice_after: String = context
         .sweat
@@ -91,7 +99,7 @@ async fn test_batch_ft_transfer() -> anyhow::Result<()> {
         .args_json(json!({ "account_id": context.alice.id() }))
         .await?
         .json()?;
-    assert_eq!(alice_after, "60");
+    assert_eq!(alice_after, "100");
 
     Ok(())
 }
