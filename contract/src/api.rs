@@ -50,6 +50,19 @@ pub trait SweatDefer {
     fn defer_batch(&mut self, steps_batch: Vec<(AccountId, u32)>) -> PromiseOrValue<()>;
 }
 
+/// Privileged batch operations over token accounts. Every method requires the
+/// [`crate::Role::Oracle`] role. See the [`crate::batch`] module.
+pub trait BatchApi {
+    /// Moves tokens between arbitrary accounts. Each entry is
+    /// `(sender_id, receiver_id, amount)`. The whole batch is atomic: if any
+    /// transfer fails, the call panics and no transfer is applied.
+    fn batch_ft_transfer(&mut self, transfers: Vec<(AccountId, AccountId, U128)>);
+    /// Removes the storage registration of every account in `account_ids` whose
+    /// SWEAT balance is zero. The holding account, accounts with a positive
+    /// balance and unregistered accounts are skipped. Returns the accounts that were actually removed.
+    fn batch_storage_unregister(&mut self, account_ids: Vec<AccountId>) -> Vec<AccountId>;
+}
+
 pub struct Payout {
     pub amount_for_user: u128,
     pub fee: u128,
