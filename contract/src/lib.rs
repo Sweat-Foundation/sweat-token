@@ -17,6 +17,7 @@ use near_sdk::{
 };
 
 pub mod api;
+mod batch;
 mod core;
 mod defer;
 mod event;
